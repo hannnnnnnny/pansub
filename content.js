@@ -68,7 +68,32 @@
     overlayEl.appendChild(translated);
     document.body.appendChild(overlayEl);
     injectStyles();
+    attachFullscreenHandler();
     applyVisibility();
+  }
+
+  function getFullscreenElement() {
+    return document.fullscreenElement
+      || document.webkitFullscreenElement
+      || document.mozFullScreenElement
+      || document.msFullscreenElement
+      || null;
+  }
+
+  function relocateOverlay() {
+    if (!overlayEl) return;
+    const fsEl = getFullscreenElement();
+    const target = fsEl || document.body;
+    if (overlayEl.parentNode !== target) {
+      target.appendChild(overlayEl);
+    }
+  }
+
+  function attachFullscreenHandler() {
+    if (attachFullscreenHandler._done) return;
+    attachFullscreenHandler._done = true;
+    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange']
+      .forEach(evt => document.addEventListener(evt, relocateOverlay));
   }
 
   function injectStyles() {
