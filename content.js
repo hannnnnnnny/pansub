@@ -136,7 +136,13 @@
     try {
       const resp = await fetch(url);
       const data = await resp.json();
-      const translated = data && data[0] && data[0][0] && data[0][0][0] ? data[0][0][0] : '';
+      let translated = '';
+      if (data && Array.isArray(data[0])) {
+        for (const seg of data[0]) {
+          if (seg && typeof seg[0] === 'string') translated += seg[0];
+        }
+      }
+      translated = translated.trim();
       translationCache.set(text, translated);
       return translated;
     } catch (err) {
