@@ -21,33 +21,72 @@
     overlayEl.id = OVERLAY_ID;
     overlayEl.style.cssText = [
       'position: fixed',
-      'bottom: 80px',
+      'bottom: 96px',
       'left: 50%',
       'transform: translateX(-50%)',
-      'max-width: 80%',
-      'background: rgba(0,0,0,0.75)',
+      'max-width: 78%',
+      'min-width: 240px',
+      'background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.78))',
+      'backdrop-filter: blur(10px)',
+      '-webkit-backdrop-filter: blur(10px)',
       'color: #fff',
-      'padding: 10px 16px',
-      'border-radius: 8px',
+      'padding: 12px 22px 14px',
+      'border-radius: 12px',
+      'border: 1px solid rgba(255,255,255,0.08)',
+      'box-shadow: 0 8px 28px rgba(0,0,0,0.45)',
       'z-index: 99999',
       'pointer-events: none',
       'text-align: center',
-      'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      'line-height: 1.4'
+      'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif',
+      'line-height: 1.45',
+      'opacity: 0',
+      'transition: opacity 0.2s ease'
     ].join(';');
 
     const original = document.createElement('div');
     original.id = ORIGINAL_ID;
-    original.style.cssText = 'font-size: 14px; opacity: 0.7; margin-bottom: 4px;';
+    original.style.cssText = [
+      'font-size: 14px',
+      'font-weight: 400',
+      'letter-spacing: 0.2px',
+      'color: rgba(255,255,255,0.72)',
+      'margin-bottom: 6px',
+      'text-shadow: 0 1px 2px rgba(0,0,0,0.6)'
+    ].join(';');
 
     const translated = document.createElement('div');
     translated.id = TRANSLATED_ID;
-    translated.style.cssText = 'font-size: 20px; color: #fff;';
+    translated.style.cssText = [
+      'font-size: 22px',
+      'font-weight: 600',
+      'letter-spacing: 0.5px',
+      'color: #fff',
+      'text-shadow: 0 2px 4px rgba(0,0,0,0.75)'
+    ].join(';');
 
     overlayEl.appendChild(original);
     overlayEl.appendChild(translated);
     document.body.appendChild(overlayEl);
+    injectStyles();
     applyVisibility();
+  }
+
+  function injectStyles() {
+    if (document.getElementById('pansub-style')) return;
+    const style = document.createElement('style');
+    style.id = 'pansub-style';
+    style.textContent = `
+      #${OVERLAY_ID}.pansub-visible { opacity: 1; }
+      /* 隐藏 Panopto 自带的字幕条，避免与 PanSub 重叠 */
+      #dockedCaptionText,
+      .event-tab-caption,
+      .captions-display,
+      [class*="captionContainer"] {
+        opacity: 0 !important;
+        visibility: hidden !important;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
   function applyVisibility() {
@@ -61,6 +100,7 @@
     const t = document.getElementById(TRANSLATED_ID);
     if (o) o.textContent = originalText;
     if (t) t.textContent = translatedText;
+    if (overlayEl) overlayEl.classList.add('pansub-visible');
   }
 
   async function translate(text) {
