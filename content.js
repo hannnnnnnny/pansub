@@ -1,7 +1,8 @@
 (() => {
   // 不同 Panopto 部署/播放器用的字幕元素不一样，按优先级匹配第一个存在的
   const CAPTION_SELECTORS = [
-    '#dockedCaptionText',
+    '#overlayCaption',          // 视频上的浮层字幕（新版 Panopto 播放器）
+    '#dockedCaptionText',       // 侧栏 docked 字幕
     '#captionDisplay',
     '.captionDisplay',
     '.captions-display',
