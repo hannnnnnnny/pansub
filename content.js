@@ -150,35 +150,111 @@
     if (overlayEl) overlayEl.classList.add('pansub-visible');
   }
 
+  // ---------- 持久缓存 ----------
+  const PERSIST_KEY = 'pansubCache';
+  const PERSIST_LIMIT = 2000; // 最多保存条数，避免 storage 撑爆
+  let persistDirty = false;
+
+  chrome.storage.local.get([PERSIST_KEY], (result) => {
+    const stored = result[PERSIST_KEY];
+    if (stored && typeof stored === 'object') {
+      for (const k of Object.keys(stored)) {
+        translationCache.set(k, stored[k]);
+      }
+      console.log(`[PanSub] 已加载 ${translationCache.size} 条持久缓存`);
+    }
+  });
+
+  function schedulePersist() {
+    if (persistDirty) return;
+    persistDirty = true;
+    setTimeout(() => {
+      persistDirty = false;
+      // 只保留最近 PERSIST_LIMIT 条
+      const entries = Array.from(translationCache.entries()).slice(-PERSIST_LIMIT);
+      const obj = Object.fromEntries(entries);
+      chrome.storage.local.set({ [PERSIST_KEY]: obj });
+    }, 3000);
+  }
+
+  // ---------- 节流 + 重试 ----------
+  const MIN_INTERVAL_MS = 350; // 两次请求最小间隔
+  const MAX_RETRY = 3;
+  let lastRequestAt = 0;
+  let backoffUntil = 0;
+
+  function sleep(ms) {
+    return new Promise(r => setTimeout(r, ms));
+  }
+
+  async function callGoogleTranslate(text) {
+    // POST 形式，避免 GET 长 URL 触发 500/414
+    const body = new URLSearchParams({
+      client: 'gtx',
+      sl: 'en',
+      tl: 'zh-CN',
+      dt: 't',
+      q: text
+    });
+    const resp = await fetch(
+      'https://translate.googleapis.com/translate_a/single',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString()
+      }
+    );
+    return resp;
+  }
+
   async function translate(text) {
     if (translationCache.has(text)) {
       return translationCache.get(text);
     }
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`;
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        console.warn(`[PanSub] 翻译接口返回 ${resp.status}`);
-        return '';
-      }
-      const data = await resp.json();
-      let translated = '';
-      if (data && Array.isArray(data[0])) {
-        for (const seg of data[0]) {
-          if (seg && typeof seg[0] === 'string') translated += seg[0];
+
+    // 节流
+    const now = Date.now();
+    const wait = Math.max(lastRequestAt + MIN_INTERVAL_MS - now, backoffUntil - now);
+    if (wait > 0) await sleep(wait);
+
+    for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
+      lastRequestAt = Date.now();
+      try {
+        const resp = await callGoogleTranslate(text);
+        if (resp.status === 429 || resp.status >= 500) {
+          // 指数退避：1.5s, 3s, 6s
+          const delay = 1500 * Math.pow(2, attempt);
+          backoffUntil = Date.now() + delay;
+          console.warn(`[PanSub] 接口 ${resp.status}，${delay}ms 后重试 (${attempt + 1}/${MAX_RETRY})`);
+          await sleep(delay);
+          continue;
         }
+        if (!resp.ok) {
+          console.warn(`[PanSub] 翻译接口返回 ${resp.status}`);
+          return '';
+        }
+        const data = await resp.json();
+        let translated = '';
+        if (data && Array.isArray(data[0])) {
+          for (const seg of data[0]) {
+            if (seg && typeof seg[0] === 'string') translated += seg[0];
+          }
+        }
+        translated = translated.trim();
+        if (!translated) {
+          console.warn('[PanSub] 翻译结果为空，原始返回：', data);
+          return '';
+        }
+        translationCache.set(text, translated);
+        schedulePersist();
+        return translated;
+      } catch (err) {
+        console.warn(`[PanSub] 翻译异常 (${attempt + 1}/${MAX_RETRY}):`, err);
+        await sleep(1500 * Math.pow(2, attempt));
       }
-      translated = translated.trim();
-      if (!translated) {
-        console.warn('[PanSub] 翻译结果为空，原始返回：', data);
-        return '';
-      }
-      translationCache.set(text, translated);
-      return translated;
-    } catch (err) {
-      console.error('[PanSub] 翻译失败:', err);
-      return '';
     }
+    console.error('[PanSub] 翻译重试耗尽，放弃此句');
+    return '';
   }
 
   let translateSeq = 0;
