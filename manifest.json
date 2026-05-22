@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "PanSub - Panopto 中文字幕",
+  "version": "1.0.0",
+  "description": "实时翻译 Panopto 视频英文字幕为中文，叠加显示在播放器上方。",
+  "permissions": ["storage", "activeTab"],
+  "host_permissions": [
+    "*://*.panopto.com/*",
+    "*://*.au.panopto.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.panopto.com/*",
+        "*://*.au.panopto.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "PanSub"
+  }
+}
