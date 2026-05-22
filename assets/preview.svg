@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">PanSub effect preview</title>
+  <desc id="desc">A Panopto lecture page with native English captions and a Chinese PanSub overlay.</desc>
+  <defs>
+    <linearGradient id="chrome" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#eef4ff"/>
+      <stop offset="1" stop-color="#dbe8ff"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="14" flood-color="#000" flood-opacity="0.24"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="720" fill="#f4f6f9"/>
+
+  <rect width="1280" height="54" fill="url(#chrome)"/>
+  <rect x="16" y="13" width="168" height="28" rx="14" fill="#fff" opacity="0.92"/>
+  <circle cx="34" cy="27" r="7" fill="#e5484d"/>
+  <circle cx="56" cy="27" r="7" fill="#f5c542"/>
+  <circle cx="78" cy="27" r="7" fill="#43b883"/>
+  <text x="102" y="32" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#334155">Panopto Video</text>
+  <rect x="205" y="13" width="720" height="28" rx="14" fill="#fff" opacity="0.92"/>
+  <text x="230" y="32" font-family="Segoe UI, Arial, sans-serif" font-size="13" fill="#475569">auckland.au.panopto.com/Panopto/Pages/Viewer.aspx</text>
+
+  <rect x="0" y="54" width="1280" height="48" fill="#fff"/>
+  <text x="22" y="84" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#12376f">University of Auckland</text>
+  <text x="315" y="84" font-family="Segoe UI, Arial, sans-serif" font-size="16" fill="#1f2937">COMPSCI 719 - Test 4 Revision</text>
+
+  <rect x="0" y="102" width="322" height="618" fill="#ffffff"/>
+  <rect x="0" y="102" width="322" height="190" fill="#050505"/>
+  <text x="24" y="224" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" fill="#a8b2c0">Waipapa Taumata Rau</text>
+  <text x="24" y="246" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#a8b2c0">University of Auckland</text>
+  <rect x="0" y="292" width="322" height="44" fill="#fff"/>
+  <text x="18" y="319" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#64748b">Search this recording</text>
+  <line x1="0" y1="336" x2="322" y2="336" stroke="#cbd5e1"/>
+
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="15">
+    <rect x="0" y="374" width="72" height="32" rx="3" fill="#17115f"/>
+    <text x="18" y="396" fill="#fff" font-weight="700">Contents</text>
+    <text x="86" y="372" fill="#1f2937">Welcome to COMPSCI 719</text>
+    <text x="288" y="372" fill="#334155">0:51</text>
+    <text x="86" y="414" fill="#1f2937">Design Description</text>
+    <text x="288" y="414" fill="#334155">6:00</text>
+    <rect x="78" y="438" width="226" height="32" fill="#e5e7eb"/>
+    <text x="86" y="460" fill="#1f2937">Pasta</text>
+    <text x="288" y="460" fill="#334155">9:18</text>
+    <text x="86" y="502" fill="#1f2937">Vendors</text>
+    <text x="288" y="502" fill="#334155">49:45</text>
+    <text x="86" y="544" fill="#1f2937">From ER to Relational</text>
+    <text x="274" y="544" fill="#334155">51:03</text>
+  </g>
+
+  <rect x="322" y="102" width="618" height="456" fill="#050505"/>
+  <rect x="362" y="118" width="552" height="372" fill="#f8fafc" filter="url(#shadow)"/>
+  <rect x="362" y="118" width="552" height="40" fill="#e7edf7"/>
+  <circle cx="379" cy="138" r="6" fill="#ef4444"/>
+  <circle cx="398" cy="138" r="6" fill="#f59e0b"/>
+  <circle cx="417" cy="138" r="6" fill="#22c55e"/>
+  <text x="394" y="205" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="700" fill="#111827">Design Description</text>
+  <g font-family="Segoe UI, Arial, sans-serif" fill="#111827">
+    <text x="394" y="264" font-size="16">A database is required to store information relating to plant varieties,</text>
+    <text x="394" y="286" font-size="16">the categories they belong to, the vendors that stock them and regions.</text>
+    <text x="394" y="330" font-size="16">The following information must also be stored in the database:</text>
+    <text x="410" y="368" font-size="16">• Plants have: name, description, maximum height</text>
+    <text x="410" y="392" font-size="16">• Categories have: name, description</text>
+    <text x="410" y="416" font-size="16">• Vendors have: name, address, contact number</text>
+    <text x="410" y="440" font-size="16">• Regions have: name, description, size</text>
+  </g>
+
+  <rect x="322" y="492" width="618" height="66" fill="#000" opacity="0.88"/>
+  <text x="371" y="522" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#fff">So the customer should be able to place a second order.</text>
+  <text x="475" y="551" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#fff">The same customer, the same plant.</text>
+
+  <rect x="250" y="577" width="472" height="70" rx="7" fill="#151515" opacity="0.78" filter="url(#shadow)"/>
+  <text x="270" y="602" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#cbd5e1">So the customer should be able to place a second order. The same customer...</text>
+  <text x="270" y="634" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700" fill="#fff">因此客户应该能够下第二个订单。同一个客户，同一个工厂。</text>
+
+  <rect x="322" y="558" width="618" height="54" fill="#f8fafc"/>
+  <rect x="475" y="583" width="342" height="7" rx="3.5" fill="#cbd5e1"/>
+  <rect x="475" y="583" width="164" height="7" rx="3.5" fill="#20116d"/>
+  <text x="838" y="592" font-family="Segoe UI, Arial, sans-serif" font-size="14" fill="#334155">-1:03:06</text>
+
+  <rect x="940" y="102" width="340" height="618" fill="#ffffff"/>
+  <rect x="940" y="102" width="340" height="38" fill="#f8fafc"/>
+  <text x="960" y="127" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700" fill="#0f172a">Console</text>
+  <g font-family="Consolas, monospace" font-size="12" fill="#111827">
+    <text x="954" y="170">[PanSub] New caption(docked): So the customer...</text>
+    <text x="954" y="198">[PanSub] New caption(docked): The same customer...</text>
+    <text x="954" y="226">[PanSub] New caption(docked): So those should...</text>
+    <text x="954" y="254">[PanSub] Found caption element(docked)</text>
+  </g>
+</svg>
