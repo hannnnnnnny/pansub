@@ -132,6 +132,10 @@
     const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`;
     try {
       const resp = await fetch(url);
+      if (!resp.ok) {
+        console.warn(`[PanSub] 翻译接口返回 ${resp.status}`);
+        return '';
+      }
       const data = await resp.json();
       let translated = '';
       if (data && Array.isArray(data[0])) {
@@ -140,6 +144,10 @@
         }
       }
       translated = translated.trim();
+      if (!translated) {
+        console.warn('[PanSub] 翻译结果为空，原始返回：', data);
+        return '';
+      }
       translationCache.set(text, translated);
       return translated;
     } catch (err) {
@@ -147,6 +155,8 @@
       return '';
     }
   }
+
+  let translateSeq = 0;
 
   function handleCaptionChange() {
     const el = document.querySelector(CAPTION_SELECTOR);
@@ -156,9 +166,15 @@
     lastText = text;
     console.log(`[PanSub] 新字幕: ${text}`);
 
+    // 先把英文铺上去，让 overlay 立刻可见；中文等翻译回来再补
+    updateOverlay(text, '');
+
     if (debounceTimer) clearTimeout(debounceTimer);
+    const mySeq = ++translateSeq;
     debounceTimer = setTimeout(async () => {
       const translated = await translate(text);
+      // 期间又有新字幕进来了，丢弃这次的结果，避免旧翻译覆盖新字幕
+      if (mySeq !== translateSeq) return;
       if (translated) {
         updateOverlay(text, translated);
       }
