@@ -1,5 +1,17 @@
 (() => {
-  const CAPTION_SELECTOR = '#dockedCaptionText';
+  // 不同 Panopto 部署/播放器用的字幕元素不一样，按优先级匹配第一个存在的
+  const CAPTION_SELECTORS = [
+    '#dockedCaptionText',
+    '#captionDisplay',
+    '.captionDisplay',
+    '.captions-display',
+    '.captionWrapper',
+    '.captionsArea',
+    '.captionItem',
+    '[class*="captionText"]',
+    '[class*="captionContent"]',
+    '[data-captions]'
+  ];
   const OVERLAY_ID = 'pansub-overlay';
   const ORIGINAL_ID = 'pansub-original';
   const TRANSLATED_ID = 'pansub-translated';
@@ -11,6 +23,22 @@
   let debounceTimer = null;
   let overlayEl = null;
   let enabled = true;
+  let activeCaptionEl = null;
+
+  function findCaptionElement() {
+    for (const sel of CAPTION_SELECTORS) {
+      const el = document.querySelector(sel);
+      if (el && el.textContent && el.textContent.trim().length > 0) {
+        return el;
+      }
+    }
+    // 兜底：返回第一个存在但暂时为空的
+    for (const sel of CAPTION_SELECTORS) {
+      const el = document.querySelector(sel);
+      if (el) return el;
+    }
+    return null;
+  }
 
   function createOverlay() {
     if (document.getElementById(OVERLAY_ID)) {
@@ -102,11 +130,7 @@
     style.id = 'pansub-style';
     style.textContent = `
       #${OVERLAY_ID}.pansub-visible { opacity: 1; }
-      /* 仅隐藏 Panopto 的浮动字幕条本体，避免与 PanSub 叠加层重叠。
-         其他 caption 相关容器（设置菜单、侧栏 transcript 等）不要碰。 */
-      #dockedCaptionText {
-        opacity: 0 !important;
-      }
+      /* 字幕元素本身的隐藏交给 hideNativeCaption() 在运行时按真实匹配到的元素来做。 */
     `;
     document.head.appendChild(style);
   }
@@ -159,7 +183,7 @@
   let translateSeq = 0;
 
   function handleCaptionChange() {
-    const el = document.querySelector(CAPTION_SELECTOR);
+    const el = activeCaptionEl || findCaptionElement();
     if (!el) return;
     const text = el.textContent.trim();
     if (!text || text === lastText) return;
@@ -195,13 +219,48 @@
 
   function waitForCaption() {
     const intervalId = setInterval(() => {
-      const el = document.querySelector(CAPTION_SELECTOR);
+      const el = findCaptionElement();
       if (el) {
         clearInterval(intervalId);
+        activeCaptionEl = el;
+        console.log('[PanSub] 找到字幕元素:', el);
         createOverlay();
+        hideNativeCaption(el);
         attachObserver(el);
+        // 同时观察 body，万一字幕元素被替换/重建
+        observeBodyForReplacement();
       }
     }, POLL_MS);
+  }
+
+  function hideNativeCaption(el) {
+    // 只隐藏字幕"文字渲染容器"，尽量不波及外层控制条/设置菜单。
+    // 找到最近的合理祖先（视觉上的字幕条），通常是显式定位的盒子。
+    try {
+      el.style.setProperty('opacity', '0', 'important');
+      // 同时把直接父节点也淡化，处理那种父容器有黑底的情况
+      const parent = el.parentElement;
+      if (parent && parent.id !== OVERLAY_ID) {
+        const cs = getComputedStyle(parent);
+        if (cs.position === 'absolute' || cs.position === 'fixed') {
+          parent.style.setProperty('opacity', '0', 'important');
+        }
+      }
+    } catch (_) {}
+  }
+
+  function observeBodyForReplacement() {
+    const bodyObserver = new MutationObserver(() => {
+      if (activeCaptionEl && !document.body.contains(activeCaptionEl)) {
+        const el = findCaptionElement();
+        if (el && el !== activeCaptionEl) {
+          activeCaptionEl = el;
+          console.log('[PanSub] 字幕元素被替换，重新挂载:', el);
+          attachObserver(el);
+        }
+      }
+    });
+    bodyObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   chrome.storage.local.get(['pansubEnabled'], (result) => {
