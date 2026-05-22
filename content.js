@@ -102,13 +102,10 @@
     style.id = 'pansub-style';
     style.textContent = `
       #${OVERLAY_ID}.pansub-visible { opacity: 1; }
-      /* 隐藏 Panopto 自带的字幕条，避免与 PanSub 重叠 */
-      #dockedCaptionText,
-      .event-tab-caption,
-      .captions-display,
-      [class*="captionContainer"] {
+      /* 仅隐藏 Panopto 的浮动字幕条本体，避免与 PanSub 叠加层重叠。
+         其他 caption 相关容器（设置菜单、侧栏 transcript 等）不要碰。 */
+      #dockedCaptionText {
         opacity: 0 !important;
-        visibility: hidden !important;
       }
     `;
     document.head.appendChild(style);
