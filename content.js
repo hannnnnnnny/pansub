@@ -1,17 +1,7 @@
 (() => {
-  // 不同 Panopto 部署/播放器用的字幕元素不一样，按优先级匹配第一个存在的
-  const CAPTION_SELECTORS = [
-    '#overlayCaption',          // 视频上的浮层字幕（新版 Panopto 播放器）
-    '#dockedCaptionText',       // 侧栏 docked 字幕
-    '#captionDisplay',
-    '.captionDisplay',
-    '.captions-display',
-    '.captionWrapper',
-    '.captionsArea',
-    '.captionItem',
-    '[class*="captionText"]',
-    '[class*="captionContent"]',
-    '[data-captions]'
+  const CAPTION_TARGETS = [
+    { selector: '#overlayCaption', mode: 'overlay' },
+    { selector: '#dockedCaptionText', mode: 'docked' }
   ];
   const OVERLAY_ID = 'pansub-overlay';
   const ORIGINAL_ID = 'pansub-original';
@@ -24,20 +14,33 @@
   let debounceTimer = null;
   let overlayEl = null;
   let enabled = true;
-  let activeCaptionEl = null;
+  let activeCaption = null;
+  const observedCaptionEls = new WeakSet();
+
+  function isVisible(el) {
+    const rect = el.getBoundingClientRect();
+    const style = getComputedStyle(el);
+    return rect.width > 0
+      && rect.height > 0
+      && style.display !== 'none'
+      && style.visibility !== 'hidden';
+  }
 
   function findCaptionElement() {
-    for (const sel of CAPTION_SELECTORS) {
-      const el = document.querySelector(sel);
-      if (el && el.textContent && el.textContent.trim().length > 0) {
-        return el;
+    for (const target of CAPTION_TARGETS) {
+      const el = document.querySelector(target.selector);
+      if (el && el.textContent.trim() && isVisible(el)) {
+        return { ...target, el };
       }
     }
-    // 兜底：返回第一个存在但暂时为空的
-    for (const sel of CAPTION_SELECTORS) {
-      const el = document.querySelector(sel);
-      if (el) return el;
+
+    for (const target of CAPTION_TARGETS) {
+      const el = document.querySelector(target.selector);
+      if (el && isVisible(el)) {
+        return { ...target, el };
+      }
     }
+
     return null;
   }
 
@@ -50,90 +53,40 @@
     overlayEl.id = OVERLAY_ID;
     overlayEl.style.cssText = [
       'position: fixed',
-      'bottom: 96px',
+      'bottom: 80px',
       'left: 50%',
       'transform: translateX(-50%)',
-      'max-width: 78%',
-      'min-width: 240px',
-      'background: linear-gradient(180deg, rgba(0,0,0,0.55), rgba(0,0,0,0.78))',
-      'backdrop-filter: blur(10px)',
-      '-webkit-backdrop-filter: blur(10px)',
+      'max-width: 80%',
+      'background: rgba(0,0,0,0.75)',
       'color: #fff',
-      'padding: 12px 22px 14px',
-      'border-radius: 12px',
-      'border: 1px solid rgba(255,255,255,0.08)',
-      'box-shadow: 0 8px 28px rgba(0,0,0,0.45)',
-      'z-index: 99999',
+      'padding: 10px 16px',
+      'border-radius: 8px',
+      'z-index: 2147483647',
       'pointer-events: none',
       'text-align: center',
-      'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif',
-      'line-height: 1.45',
-      'opacity: 0',
-      'transition: opacity 0.2s ease'
+      'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      'line-height: 1.4'
     ].join(';');
 
     const original = document.createElement('div');
     original.id = ORIGINAL_ID;
-    original.style.cssText = [
-      'font-size: 14px',
-      'font-weight: 400',
-      'letter-spacing: 0.2px',
-      'color: rgba(255,255,255,0.72)',
-      'margin-bottom: 6px',
-      'text-shadow: 0 1px 2px rgba(0,0,0,0.6)'
-    ].join(';');
+    original.style.cssText = 'font-size: 14px; opacity: 0.7; margin-bottom: 4px;';
 
     const translated = document.createElement('div');
     translated.id = TRANSLATED_ID;
-    translated.style.cssText = [
-      'font-size: 22px',
-      'font-weight: 600',
-      'letter-spacing: 0.5px',
-      'color: #fff',
-      'text-shadow: 0 2px 4px rgba(0,0,0,0.75)'
-    ].join(';');
+    translated.style.cssText = 'font-size: 20px; color: #fff;';
 
     overlayEl.appendChild(original);
     overlayEl.appendChild(translated);
     document.body.appendChild(overlayEl);
-    injectStyles();
-    attachFullscreenHandler();
     applyVisibility();
-  }
+    applyOverlayPosition(activeCaption);
 
-  function getFullscreenElement() {
-    return document.fullscreenElement
-      || document.webkitFullscreenElement
-      || document.mozFullScreenElement
-      || document.msFullscreenElement
-      || null;
-  }
-
-  function relocateOverlay() {
-    if (!overlayEl) return;
-    const fsEl = getFullscreenElement();
-    const target = fsEl || document.body;
-    if (overlayEl.parentNode !== target) {
-      target.appendChild(overlayEl);
+    if (!createOverlay._listenersAttached) {
+      createOverlay._listenersAttached = true;
+      window.addEventListener('resize', () => applyOverlayPosition(activeCaption));
+      window.addEventListener('scroll', () => applyOverlayPosition(activeCaption), true);
     }
-  }
-
-  function attachFullscreenHandler() {
-    if (attachFullscreenHandler._done) return;
-    attachFullscreenHandler._done = true;
-    ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange', 'MSFullscreenChange']
-      .forEach(evt => document.addEventListener(evt, relocateOverlay));
-  }
-
-  function injectStyles() {
-    if (document.getElementById('pansub-style')) return;
-    const style = document.createElement('style');
-    style.id = 'pansub-style';
-    style.textContent = `
-      #${OVERLAY_ID}.pansub-visible { opacity: 1; }
-      /* 字幕元素本身的隐藏交给 hideNativeCaption() 在运行时按真实匹配到的元素来做。 */
-    `;
-    document.head.appendChild(style);
   }
 
   function applyVisibility() {
@@ -147,135 +100,77 @@
     const t = document.getElementById(TRANSLATED_ID);
     if (o) o.textContent = originalText;
     if (t) t.textContent = translatedText;
-    if (overlayEl) overlayEl.classList.add('pansub-visible');
+    applyOverlayPosition(activeCaption);
   }
 
-  // ---------- 持久缓存 ----------
-  const PERSIST_KEY = 'pansubCache';
-  const PERSIST_LIMIT = 2000; // 最多保存条数，避免 storage 撑爆
-  let persistDirty = false;
+  function applyOverlayPosition(caption) {
+    if (!overlayEl) return;
 
-  chrome.storage.local.get([PERSIST_KEY], (result) => {
-    const stored = result[PERSIST_KEY];
-    if (stored && typeof stored === 'object') {
-      for (const k of Object.keys(stored)) {
-        translationCache.set(k, stored[k]);
-      }
-      console.log(`[PanSub] 已加载 ${translationCache.size} 条持久缓存`);
+    if (!caption || caption.mode === 'overlay') {
+      overlayEl.style.top = 'auto';
+      overlayEl.style.bottom = '80px';
+      overlayEl.style.left = '50%';
+      overlayEl.style.transform = 'translateX(-50%)';
+      overlayEl.style.maxWidth = '80%';
+      return;
     }
-  });
 
-  function schedulePersist() {
-    if (persistDirty) return;
-    persistDirty = true;
-    setTimeout(() => {
-      persistDirty = false;
-      // 只保留最近 PERSIST_LIMIT 条
-      const entries = Array.from(translationCache.entries()).slice(-PERSIST_LIMIT);
-      const obj = Object.fromEntries(entries);
-      chrome.storage.local.set({ [PERSIST_KEY]: obj });
-    }, 3000);
-  }
-
-  // ---------- 节流 + 重试 ----------
-  const MIN_INTERVAL_MS = 350; // 两次请求最小间隔
-  const MAX_RETRY = 3;
-  let lastRequestAt = 0;
-  let backoffUntil = 0;
-
-  function sleep(ms) {
-    return new Promise(r => setTimeout(r, ms));
-  }
-
-  async function callGoogleTranslate(text) {
-    // POST 形式，避免 GET 长 URL 触发 500/414
-    const body = new URLSearchParams({
-      client: 'gtx',
-      sl: 'en',
-      tl: 'zh-CN',
-      dt: 't',
-      q: text
-    });
-    const resp = await fetch(
-      'https://translate.googleapis.com/translate_a/single',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString()
-      }
-    );
-    return resp;
+    overlayEl.style.top = 'auto';
+    overlayEl.style.bottom = '120px';
+    overlayEl.style.left = '50%';
+    overlayEl.style.transform = 'translateX(-50%)';
+    overlayEl.style.maxWidth = '80%';
   }
 
   async function translate(text) {
     if (translationCache.has(text)) {
       return translationCache.get(text);
     }
-
-    // 节流
-    const now = Date.now();
-    const wait = Math.max(lastRequestAt + MIN_INTERVAL_MS - now, backoffUntil - now);
-    if (wait > 0) await sleep(wait);
-
-    for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
-      lastRequestAt = Date.now();
-      try {
-        const resp = await callGoogleTranslate(text);
-        if (resp.status === 429 || resp.status >= 500) {
-          // 指数退避：1.5s, 3s, 6s
-          const delay = 1500 * Math.pow(2, attempt);
-          backoffUntil = Date.now() + delay;
-          console.warn(`[PanSub] 接口 ${resp.status}，${delay}ms 后重试 (${attempt + 1}/${MAX_RETRY})`);
-          await sleep(delay);
-          continue;
-        }
-        if (!resp.ok) {
-          console.warn(`[PanSub] 翻译接口返回 ${resp.status}`);
-          return '';
-        }
-        const data = await resp.json();
-        let translated = '';
-        if (data && Array.isArray(data[0])) {
-          for (const seg of data[0]) {
-            if (seg && typeof seg[0] === 'string') translated += seg[0];
-          }
-        }
-        translated = translated.trim();
-        if (!translated) {
-          console.warn('[PanSub] 翻译结果为空，原始返回：', data);
-          return '';
-        }
-        translationCache.set(text, translated);
-        schedulePersist();
-        return translated;
-      } catch (err) {
-        console.warn(`[PanSub] 翻译异常 (${attempt + 1}/${MAX_RETRY}):`, err);
-        await sleep(1500 * Math.pow(2, attempt));
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&q=${encodeURIComponent(text)}`;
+    try {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        console.warn(`[PanSub] 翻译接口返回 ${resp.status}`);
+        return '';
       }
+      const data = await resp.json();
+      let translated = '';
+      if (data && Array.isArray(data[0])) {
+        for (const seg of data[0]) {
+          if (seg && typeof seg[0] === 'string') translated += seg[0];
+        }
+      }
+      translated = translated.trim();
+      if (!translated) {
+        console.warn('[PanSub] 翻译结果为空:', data);
+        return '';
+      }
+      translationCache.set(text, translated);
+      return translated;
+    } catch (err) {
+      console.error('[PanSub] 翻译失败:', err);
+      return '';
     }
-    console.error('[PanSub] 翻译重试耗尽，放弃此句');
-    return '';
   }
 
-  let translateSeq = 0;
-
   function handleCaptionChange() {
-    const el = activeCaptionEl || findCaptionElement();
-    if (!el) return;
+    const caption = findCaptionElement();
+    if (!caption) return;
+
+    activeCaption = caption;
+    attachObserver(caption.el);
+    applyOverlayPosition(caption);
+
+    const el = caption.el;
     const text = el.textContent.trim();
     if (!text || text === lastText) return;
     lastText = text;
-    console.log(`[PanSub] 新字幕: ${text}`);
-
-    // 先把英文铺上去，让 overlay 立刻可见；中文等翻译回来再补
+    console.log(`[PanSub] 新字幕(${caption.mode}): ${text}`);
     updateOverlay(text, '');
 
     if (debounceTimer) clearTimeout(debounceTimer);
-    const mySeq = ++translateSeq;
     debounceTimer = setTimeout(async () => {
       const translated = await translate(text);
-      // 期间又有新字幕进来了，丢弃这次的结果，避免旧翻译覆盖新字幕
-      if (mySeq !== translateSeq) return;
       if (translated) {
         updateOverlay(text, translated);
       }
@@ -283,6 +178,9 @@
   }
 
   function attachObserver(target) {
+    if (observedCaptionEls.has(target)) return;
+    observedCaptionEls.add(target);
+
     const observer = new MutationObserver(() => {
       handleCaptionChange();
     });
@@ -291,53 +189,19 @@
       subtree: true,
       characterData: true
     });
-    handleCaptionChange();
   }
 
   function waitForCaption() {
-    const intervalId = setInterval(() => {
-      const el = findCaptionElement();
-      if (el) {
-        clearInterval(intervalId);
-        activeCaptionEl = el;
-        console.log('[PanSub] 找到字幕元素:', el);
+    setInterval(() => {
+      const caption = findCaptionElement();
+      if (caption) {
+        if (activeCaption?.el !== caption.el || activeCaption?.mode !== caption.mode) {
+          console.log(`[PanSub] 找到字幕元素(${caption.mode}):`, caption.el);
+        }
         createOverlay();
-        hideNativeCaption(el);
-        attachObserver(el);
-        // 同时观察 body，万一字幕元素被替换/重建
-        observeBodyForReplacement();
+        handleCaptionChange();
       }
     }, POLL_MS);
-  }
-
-  function hideNativeCaption(el) {
-    // 只隐藏字幕"文字渲染容器"，尽量不波及外层控制条/设置菜单。
-    // 找到最近的合理祖先（视觉上的字幕条），通常是显式定位的盒子。
-    try {
-      el.style.setProperty('opacity', '0', 'important');
-      // 同时把直接父节点也淡化，处理那种父容器有黑底的情况
-      const parent = el.parentElement;
-      if (parent && parent.id !== OVERLAY_ID) {
-        const cs = getComputedStyle(parent);
-        if (cs.position === 'absolute' || cs.position === 'fixed') {
-          parent.style.setProperty('opacity', '0', 'important');
-        }
-      }
-    } catch (_) {}
-  }
-
-  function observeBodyForReplacement() {
-    const bodyObserver = new MutationObserver(() => {
-      if (activeCaptionEl && !document.body.contains(activeCaptionEl)) {
-        const el = findCaptionElement();
-        if (el && el !== activeCaptionEl) {
-          activeCaptionEl = el;
-          console.log('[PanSub] 字幕元素被替换，重新挂载:', el);
-          attachObserver(el);
-        }
-      }
-    });
-    bodyObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   chrome.storage.local.get(['pansubEnabled'], (result) => {
