@@ -63,6 +63,26 @@ When a new caption appears, PanSub shows the English line immediately, then fill
 
 Important: Chrome runs the exact local folder you selected with **Load unpacked**. If you edit a different folder, GitHub, or another clone, the browser extension will not update until you load or update the same local folder.
 
+## Chrome Web Store Release
+
+Current release version: `1.1.0`.
+
+The clean extension package is generated as:
+
+```text
+dist/pansub-1.1.0.zip
+```
+
+The zip package keeps `manifest.json` at the package root and excludes `.git`, `dist`, temporary folders, source screenshots from other products, and local development files.
+
+Store assets are included in this repository:
+
+- Extension icons: `assets/icon16.png`, `assets/icon32.png`, `assets/icon48.png`, `assets/icon128.png`
+- Main store screenshot: `assets/store/screenshot-main-1280x800.png`
+- Settings screenshot: `assets/store/screenshot-settings-1280x800.png`
+
+Use [PRIVACY.md](PRIVACY.md) as the privacy policy source when preparing a public listing.
+
 ## Supported Sites
 
 ```json
@@ -78,7 +98,17 @@ If your Panopto site uses another domain, add it to `host_permissions` and `cont
 
 ```text
 pansub/
-├── assets/preview.svg
+├── assets/
+│   ├── icon.svg
+│   ├── icon16.png
+│   ├── icon32.png
+│   ├── icon48.png
+│   ├── icon128.png
+│   ├── preview.svg
+│   └── store/
+│       ├── screenshot-main-1280x800.png
+│       └── screenshot-settings-1280x800.png
+├── .gitignore
 ├── manifest.json
 ├── content.js
 ├── popup.html
@@ -86,6 +116,7 @@ pansub/
 ├── options.html
 ├── options.css
 ├── options.js
+├── PRIVACY.md
 └── README.md
 ```
 
@@ -105,6 +136,10 @@ pansub/
 ## Notes
 
 - Translation uses the unofficial Google Translate `client=gtx` endpoint.
+- Current caption text is sent to Google Translate for translation.
+- Settings and the translation cache are stored locally with `chrome.storage.local`.
+- PanSub does not include analytics, advertising, tracking pixels, or an author-owned remote server.
+- See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 - The extension requires Panopto captions to be turned on.
 - Network speed and Google rate limits may affect translation latency.
 
@@ -179,6 +214,26 @@ PanSub 会监听 Panopto 播放器渲染出来的英文字幕，把最新字幕�
 
 注意：Chrome 运行的是你点击 **加载已解压的扩展程序** 时选中的那个本地文件夹。如果你改的是 GitHub 页面、另一个目录、或者另一个 clone，浏览器里的插件不会自动更新，必须更新并重新加载 Chrome 实际加载的那个文件夹。
 
+## Chrome Web Store 发布
+
+当前发布版本：`1.1.0`。
+
+干净的扩展发布包会生成在：
+
+```text
+dist/pansub-1.1.0.zip
+```
+
+这个 zip 包会把 `manifest.json` 放在压缩包根目录，并排除 `.git`、`dist`、临时目录、来自其他产品的截图源文件和本地开发文件。
+
+商店素材已经放在仓库里：
+
+- 扩展图标：`assets/icon16.png`、`assets/icon32.png`、`assets/icon48.png`、`assets/icon128.png`
+- 主效果截图：`assets/store/screenshot-main-1280x800.png`
+- 设置页截图：`assets/store/screenshot-settings-1280x800.png`
+
+公开发布时，可以使用 [PRIVACY.md](PRIVACY.md) 作为隐私政策来源。
+
 ## 支持的网站
 
 ```json
@@ -194,7 +249,17 @@ PanSub 会监听 Panopto 播放器渲染出来的英文字幕，把最新字幕�
 
 ```text
 pansub/
-├── assets/preview.svg
+├── assets/
+│   ├── icon.svg
+│   ├── icon16.png
+│   ├── icon32.png
+│   ├── icon48.png
+│   ├── icon128.png
+│   ├── preview.svg
+│   └── store/
+│       ├── screenshot-main-1280x800.png
+│       └── screenshot-settings-1280x800.png
+├── .gitignore
 ├── manifest.json
 ├── content.js
 ├── popup.html
@@ -202,6 +267,7 @@ pansub/
 ├── options.html
 ├── options.css
 ├── options.js
+├── PRIVACY.md
 └── README.md
 ```
 
@@ -221,6 +287,10 @@ pansub/
 ## 说明
 
 - 翻译使用非官方 Google Translate `client=gtx` 接口。
+- 当前字幕文本会发送到 Google Translate 用于翻译。
+- 设置和翻译缓存会通过 `chrome.storage.local` 保存在本地。
+- PanSub 不包含分析统计、广告、追踪像素或作者自建远程服务器。
+- 完整隐私说明见 [PRIVACY.md](PRIVACY.md)。
 - 必须先在 Panopto 播放器里开启字幕。
 - 网络速度和 Google 限流可能影响翻译延迟。
 
