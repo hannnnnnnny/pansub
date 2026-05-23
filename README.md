@@ -4,6 +4,12 @@ Chrome extension that adds real-time Chinese subtitles to Panopto lecture record
 
 ![PanSub effect preview](assets/preview.svg)
 
+## Live Translation Demo
+
+![PanSub live translation demo](assets/demo.gif)
+
+This demo runs the real PanSub content script and Google Translate flow with sample lecture captions. It does not include private course footage or third-party course content.
+
 ## What It Does
 
 PanSub watches the English caption text rendered by the Panopto player, sends the latest caption to Google Translate, and displays a bilingual overlay on top of the recording page.
@@ -106,6 +112,7 @@ pansub/
 │   ├── icon32.png
 │   ├── icon48.png
 │   ├── icon128.png
+│   ├── demo.gif
 │   ├── preview.svg
 │   └── store/
 │       ├── promo-marquee-1400x560.png
@@ -159,6 +166,12 @@ MIT
 PanSub 是一个 Chrome 扩展，用来给 Panopto 课程录像实时叠加中文字幕。
 
 ![PanSub 效果图](assets/preview.svg)
+
+## 实时翻译演示
+
+![PanSub 实时翻译演示](assets/demo.gif)
+
+这段演示使用真实的 PanSub content script 和 Google Translate 翻译流程，字幕内容是示例课程句子，不包含真实课程录像或第三方课程内容。
 
 ## 功能
 
@@ -262,6 +275,7 @@ pansub/
 │   ├── icon32.png
 │   ├── icon48.png
 │   ├── icon128.png
+│   ├── demo.gif
 │   ├── preview.svg
 │   └── store/
 │       ├── promo-marquee-1400x560.png
