@@ -80,8 +80,10 @@ Store assets are included in this repository:
 - Extension icons: `assets/icon16.png`, `assets/icon32.png`, `assets/icon48.png`, `assets/icon128.png`
 - Main store screenshot: `assets/store/screenshot-main-1280x800.png`
 - Settings screenshot: `assets/store/screenshot-settings-1280x800.png`
+- Small promo tile: `assets/store/promo-small-440x280.png`
+- Optional marquee promo tile: `assets/store/promo-marquee-1400x560.png`
 
-Use [PRIVACY.md](PRIVACY.md) as the privacy policy source when preparing a public listing.
+Use [PRIVACY.md](PRIVACY.md) as the privacy policy source and [STORE_LISTING.md](STORE_LISTING.md) for copy-paste listing fields when preparing a public listing.
 
 ## Supported Sites
 
@@ -106,6 +108,8 @@ pansub/
 │   ├── icon128.png
 │   ├── preview.svg
 │   └── store/
+│       ├── promo-marquee-1400x560.png
+│       ├── promo-small-440x280.png
 │       ├── screenshot-main-1280x800.png
 │       └── screenshot-settings-1280x800.png
 ├── .gitignore
@@ -117,6 +121,7 @@ pansub/
 ├── options.css
 ├── options.js
 ├── PRIVACY.md
+├── STORE_LISTING.md
 └── README.md
 ```
 
@@ -231,8 +236,10 @@ dist/pansub-1.1.0.zip
 - 扩展图标：`assets/icon16.png`、`assets/icon32.png`、`assets/icon48.png`、`assets/icon128.png`
 - 主效果截图：`assets/store/screenshot-main-1280x800.png`
 - 设置页截图：`assets/store/screenshot-settings-1280x800.png`
+- 小宣传图：`assets/store/promo-small-440x280.png`
+- 可选横幅宣传图：`assets/store/promo-marquee-1400x560.png`
 
-公开发布时，可以使用 [PRIVACY.md](PRIVACY.md) 作为隐私政策来源。
+公开发布时，可以使用 [PRIVACY.md](PRIVACY.md) 作为隐私政策来源，并用 [STORE_LISTING.md](STORE_LISTING.md) 复制商店表单文案。
 
 ## 支持的网站
 
@@ -257,6 +264,8 @@ pansub/
 │   ├── icon128.png
 │   ├── preview.svg
 │   └── store/
+│       ├── promo-marquee-1400x560.png
+│       ├── promo-small-440x280.png
 │       ├── screenshot-main-1280x800.png
 │       └── screenshot-settings-1280x800.png
 ├── .gitignore
@@ -268,6 +277,7 @@ pansub/
 ├── options.css
 ├── options.js
 ├── PRIVACY.md
+├── STORE_LISTING.md
 └── README.md
 ```
 
