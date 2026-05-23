@@ -1,6 +1,12 @@
-# PanSub
+<p align="center">
+  <img src="assets/icon128.png" alt="PanSub logo" width="96" height="96">
+</p>
 
-Chrome extension that adds real-time Chinese subtitles to Panopto lecture recordings.
+<h1 align="center">PanSub</h1>
+
+<p align="center">
+  Chrome extension that adds real-time Chinese subtitles to Panopto lecture recordings.
+</p>
 
 ![PanSub effect preview](assets/preview.svg)
 
