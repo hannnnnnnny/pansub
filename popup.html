@@ -4,79 +4,138 @@
   <meta charset="UTF-8">
   <title>PanSub</title>
   <style>
+    :root {
+      --ink: #f8fafc;
+      --muted: #a8b3c4;
+      --line: rgba(255,255,255,.12);
+      --accent: #6ea8ff;
+      --bg: #111827;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      width: 240px;
+      width: 292px;
       margin: 0;
       padding: 16px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #1e1e1e;
-      color: #fff;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
     }
+
+    header {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .mark {
+      display: grid;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border-radius: 8px;
+      background: var(--accent);
+      color: #08111f;
+      font-weight: 900;
+    }
+
     h1 {
-      font-size: 16px;
-      margin: 0 0 12px 0;
+      margin: 0;
+      font-size: 17px;
     }
+
     .status {
-      font-size: 13px;
-      color: #9aa0a6;
-      margin-bottom: 16px;
+      margin: 3px 0 0;
+      color: var(--muted);
+      font-size: 12px;
     }
+
     .row {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
+      padding: 12px 0;
+      border-top: 1px solid var(--line);
     }
+
+    label,
     .label {
       font-size: 14px;
+      font-weight: 650;
     }
-    .switch {
-      position: relative;
-      display: inline-block;
+
+    select {
+      min-width: 128px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 8px;
+      color: var(--ink);
+      background: #1f2937;
+    }
+
+    input[type="checkbox"] {
       width: 42px;
       height: 24px;
+      accent-color: var(--accent);
     }
-    .switch input {
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    .slider {
-      position: absolute;
+
+    button {
+      width: 100%;
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      color: var(--ink);
+      background: #1f2937;
       cursor: pointer;
-      top: 0; left: 0; right: 0; bottom: 0;
-      background-color: #555;
-      transition: .2s;
-      border-radius: 24px;
+      font-weight: 700;
     }
-    .slider:before {
-      position: absolute;
-      content: "";
-      height: 18px;
-      width: 18px;
-      left: 3px;
-      bottom: 3px;
-      background-color: white;
-      transition: .2s;
-      border-radius: 50%;
-    }
-    input:checked + .slider {
-      background-color: #4caf50;
-    }
-    input:checked + .slider:before {
-      transform: translateX(18px);
+
+    button:hover {
+      border-color: var(--accent);
     }
   </style>
 </head>
 <body>
-  <h1>PanSub 已启用</h1>
-  <div class="status" id="status">实时翻译 Panopto 英文字幕</div>
+  <header>
+    <div class="mark">P</div>
+    <div>
+      <h1>PanSub</h1>
+      <p class="status" id="status">Canvas / Panopto subtitles</p>
+    </div>
+  </header>
+
   <div class="row">
-    <span class="label">显示字幕</span>
-    <label class="switch">
-      <input type="checkbox" id="toggle">
-      <span class="slider"></span>
-    </label>
+    <span class="label">Show subtitles</span>
+    <input type="checkbox" id="enabled">
   </div>
+
+  <div class="row">
+    <label for="displayMode">Mode</label>
+    <select id="displayMode">
+      <option value="bilingual">Bilingual</option>
+      <option value="translation">Translation only</option>
+      <option value="original">Original only</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label for="subtitlePosition">Position</label>
+    <select id="subtitlePosition">
+      <option value="auto">Auto</option>
+      <option value="video-bottom">Video bottom</option>
+      <option value="page-bottom">Page bottom</option>
+      <option value="follow-caption">Follow caption</option>
+    </select>
+  </div>
+
+  <button id="openOptions" type="button">Open settings</button>
+
   <script src="popup.js"></script>
 </body>
 </html>
