@@ -12,42 +12,49 @@
       <div>
         <div class="mark">P</div>
         <h1>PanSub</h1>
-        <p>Canvas / Panopto subtitle translator</p>
+        <p data-i18n="railSubtitle">Canvas / Panopto subtitle translator</p>
       </div>
-      <nav aria-label="Settings sections">
-        <a href="#general">General</a>
-        <a href="#subtitles">Subtitles</a>
-        <a href="#translation">Translation</a>
-        <a href="#floating">Quick Button</a>
-        <a href="#debug">Debug</a>
+      <nav aria-label="Settings sections" data-i18n-aria-label="settingsSections">
+        <a href="#general" data-i18n="navGeneral">General</a>
+        <a href="#subtitles" data-i18n="navSubtitles">Subtitles</a>
+        <a href="#translation" data-i18n="navTranslation">Translation</a>
+        <a href="#floating" data-i18n="navFloating">Quick Button</a>
+        <a href="#debug" data-i18n="navDebug">Debug</a>
       </nav>
     </aside>
 
     <section class="panel">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Settings</p>
-          <h2>Lecture subtitle controls</h2>
+          <p class="eyebrow" data-i18n="eyebrow">Settings</p>
+          <h2 data-i18n="pageTitle">Lecture subtitle controls</h2>
         </div>
-        <button id="reset" type="button">Reset</button>
+        <button id="reset" type="button" data-i18n="reset">Reset</button>
       </header>
 
       <section id="general" class="group">
         <div class="group-title">
-          <h3>General</h3>
-          <p>Choose when PanSub appears on Panopto recordings.</p>
+          <h3 data-i18n="generalTitle">General</h3>
+          <p data-i18n="generalDescription">Choose when PanSub appears on Panopto recordings.</p>
         </div>
+        <label class="field">
+          <span data-i18n="interfaceLanguage">Interface language</span>
+          <select id="interfaceLanguage">
+            <option value="en" data-i18n="languageEnglish">English</option>
+            <option value="zh-CN" data-i18n="languageChinese">中文</option>
+          </select>
+        </label>
         <label class="switch-row">
           <span>
-            <strong>Enable PanSub</strong>
-            <small>Show translated subtitles on matching Panopto pages.</small>
+            <strong data-i18n="enablePanSub">Enable PanSub</strong>
+            <small data-i18n="enablePanSubHelp">Show translated subtitles on matching Panopto pages.</small>
           </span>
           <input id="enabled" type="checkbox">
         </label>
         <label class="switch-row">
           <span>
-            <strong>Hide native Panopto captions</strong>
-            <small>Use this when the original captions overlap with PanSub.</small>
+            <strong data-i18n="hideNativeCaptions">Hide native Panopto captions</strong>
+            <small data-i18n="hideNativeCaptionsHelp">Use this when the original captions overlap with PanSub.</small>
           </span>
           <input id="hideNativeCaptions" type="checkbox">
         </label>
@@ -55,47 +62,47 @@
 
       <section id="subtitles" class="group">
         <div class="group-title">
-          <h3>Subtitle Display</h3>
-          <p>Control the overlay text, placement, and visual weight.</p>
+          <h3 data-i18n="subtitleDisplayTitle">Subtitle Display</h3>
+          <p data-i18n="subtitleDisplayDescription">Control the overlay text, placement, and visual weight.</p>
         </div>
 
         <label class="field">
-          <span>Display mode</span>
+          <span data-i18n="displayMode">Display mode</span>
           <select id="displayMode">
-            <option value="bilingual">Bilingual</option>
-            <option value="translation">Translation only</option>
-            <option value="original">Original only</option>
+            <option value="bilingual" data-i18n="displayBilingual">Bilingual</option>
+            <option value="translation" data-i18n="displayTranslation">Translation only</option>
+            <option value="original" data-i18n="displayOriginal">Original only</option>
           </select>
         </label>
 
         <label class="field">
-          <span>Position</span>
+          <span data-i18n="position">Position</span>
           <select id="subtitlePosition">
-            <option value="auto">Auto</option>
-            <option value="video-bottom">Video bottom</option>
-            <option value="page-bottom">Page bottom</option>
-            <option value="follow-caption">Follow caption element</option>
+            <option value="auto" data-i18n="positionAuto">Auto</option>
+            <option value="video-bottom" data-i18n="positionVideoBottom">Video bottom</option>
+            <option value="page-bottom" data-i18n="positionPageBottom">Page bottom</option>
+            <option value="follow-caption" data-i18n="positionFollowCaption">Follow caption element</option>
           </select>
         </label>
 
         <div class="grid">
           <label class="field">
-            <span>Chinese size</span>
+            <span data-i18n="translationSize">Translation size</span>
             <input id="fontSize" type="range" min="14" max="42" step="1">
             <output id="fontSizeValue"></output>
           </label>
           <label class="field">
-            <span>English size</span>
+            <span data-i18n="originalSize">Original size</span>
             <input id="originalFontSize" type="range" min="10" max="24" step="1">
             <output id="originalFontSizeValue"></output>
           </label>
           <label class="field">
-            <span>Overlay width</span>
+            <span data-i18n="overlayWidth">Overlay width</span>
             <input id="maxWidth" type="range" min="40" max="96" step="1">
             <output id="maxWidthValue"></output>
           </label>
           <label class="field">
-            <span>Background opacity</span>
+            <span data-i18n="backgroundOpacity">Background opacity</span>
             <input id="backgroundOpacity" type="range" min="20" max="95" step="1">
             <output id="backgroundOpacityValue"></output>
           </label>
@@ -104,29 +111,29 @@
 
       <section id="translation" class="group">
         <div class="group-title">
-          <h3>Translation</h3>
-          <p>Keep the provider simple now, but make the language configurable.</p>
+          <h3 data-i18n="translationTitle">Translation</h3>
+          <p data-i18n="translationDescription">Keep the provider simple now, but make the language configurable.</p>
         </div>
         <label class="field">
-          <span>Target language</span>
+          <span data-i18n="targetLanguage">Target language</span>
           <select id="targetLanguage">
-            <option value="zh-CN">Chinese Simplified</option>
-            <option value="zh-TW">Chinese Traditional</option>
-            <option value="ja">Japanese</option>
-            <option value="ko">Korean</option>
-            <option value="en">English</option>
+            <option value="zh-CN" data-i18n="targetChineseSimplified">Chinese Simplified</option>
+            <option value="zh-TW" data-i18n="targetChineseTraditional">Chinese Traditional</option>
+            <option value="ja" data-i18n="targetJapanese">Japanese</option>
+            <option value="ko" data-i18n="targetKorean">Korean</option>
+            <option value="en" data-i18n="targetEnglish">English</option>
           </select>
         </label>
         <label class="field">
-          <span>Provider</span>
+          <span data-i18n="provider">Provider</span>
           <select id="provider" disabled>
             <option>Google Translate endpoint</option>
           </select>
         </label>
         <label class="switch-row">
           <span>
-            <strong>Local translation cache</strong>
-            <small>Reuse translated lines during the same course recording.</small>
+            <strong data-i18n="localCache">Local translation cache</strong>
+            <small data-i18n="localCacheHelp">Reuse translated lines during the same course recording.</small>
           </span>
           <input id="cacheEnabled" type="checkbox">
         </label>
@@ -134,39 +141,39 @@
 
       <section id="floating" class="group">
         <div class="group-title">
-          <h3>Quick Button</h3>
-          <p>Add a small page-side control for turning PanSub on or off while watching.</p>
+          <h3 data-i18n="quickButtonTitle">Quick Button</h3>
+          <p data-i18n="quickButtonDescription">Add a small page-side control for turning PanSub on or off while watching.</p>
         </div>
         <div class="preview floating-preview">
           <div class="sample-page">
-            <p>Panopto lecture recording</p>
+            <p data-i18n="samplePage">Panopto lecture recording</p>
             <button type="button" class="sample-float">P</button>
           </div>
         </div>
         <label class="switch-row">
           <span>
-            <strong>Show quick button</strong>
-            <small>Display a small PanSub button on matching Panopto pages.</small>
+            <strong data-i18n="showQuickButton">Show quick button</strong>
+            <small data-i18n="showQuickButtonHelp">Display a small PanSub button on matching Panopto pages.</small>
           </span>
           <input id="floatingButtonEnabled" type="checkbox">
         </label>
         <label class="switch-row">
           <span>
-            <strong>Fade until hover</strong>
-            <small>Keep the button quiet until your cursor moves over it.</small>
+            <strong data-i18n="fadeUntilHover">Fade until hover</strong>
+            <small data-i18n="fadeUntilHoverHelp">Keep the button quiet until your cursor moves over it.</small>
           </span>
           <input id="floatingButtonHoverOnly" type="checkbox">
         </label>
         <div class="grid">
           <label class="field">
-            <span>Side</span>
+            <span data-i18n="side">Side</span>
             <select id="floatingButtonSide">
-              <option value="right">Right</option>
-              <option value="left">Left</option>
+              <option value="right" data-i18n="sideRight">Right</option>
+              <option value="left" data-i18n="sideLeft">Left</option>
             </select>
           </label>
           <label class="field">
-            <span>Collapsed opacity</span>
+            <span data-i18n="collapsedOpacity">Collapsed opacity</span>
             <input id="floatingButtonOpacity" type="range" min="20" max="100" step="1">
             <output id="floatingButtonOpacityValue"></output>
           </label>
@@ -175,22 +182,22 @@
 
       <section id="debug" class="group">
         <div class="group-title">
-          <h3>Debug</h3>
-          <p>Useful when Panopto changes its player markup.</p>
+          <h3 data-i18n="debugTitle">Debug</h3>
+          <p data-i18n="debugDescription">Useful when Panopto changes its player markup.</p>
         </div>
         <label class="switch-row">
           <span>
-            <strong>Console diagnostics</strong>
-            <small>Print matched caption nodes and subtitle updates.</small>
+            <strong data-i18n="consoleDiagnostics">Console diagnostics</strong>
+            <small data-i18n="consoleDiagnosticsHelp">Print matched caption nodes and subtitle updates.</small>
           </span>
           <input id="debugLogs" type="checkbox">
         </label>
-        <div class="note">
+        <div class="note" data-i18n-html="debugNote">
           Open DevTools on the Panopto page and look for <code>[PanSub]</code> messages.
         </div>
       </section>
 
-      <div id="saved" class="toast" role="status" aria-live="polite">Saved</div>
+      <div id="saved" class="toast" role="status" aria-live="polite" data-i18n="saved">Saved</div>
     </section>
   </main>
 

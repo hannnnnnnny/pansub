@@ -55,6 +55,7 @@ It watches the visible English captions rendered by the Panopto player, translat
 
 Features:
 - Real-time bilingual subtitles for Canvas / Panopto recordings
+- Interface language switch for English or Chinese settings UI
 - Display modes: bilingual, translation only, or original only
 - Position modes for on-video captions and docked Panopto captions
 - Adjustable subtitle size, overlay width, and background opacity
@@ -118,7 +119,7 @@ Publish automatically after review: Off for staged review, On if you want immedi
 Extension package:
 
 ```text
-dist/pansub-1.1.0.zip
+dist/pansub-1.1.1.zip
 ```
 
 Icon:
@@ -205,6 +206,7 @@ It watches the visible English captions rendered by the Panopto player, translat
 
 Features:
 - Real-time bilingual subtitles for Canvas / Panopto recordings
+- Interface language switch for English or Chinese settings UI
 - Display modes: bilingual, translation only, or original only
 - Position modes for on-video captions and docked Panopto captions
 - Adjustable subtitle size, overlay width, and background opacity

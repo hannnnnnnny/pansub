@@ -106,35 +106,43 @@
     <div class="mark">P</div>
     <div>
       <h1>PanSub</h1>
-      <p class="status" id="status">Canvas / Panopto subtitles</p>
+      <p class="status" id="status" data-i18n="statusReady">Canvas / Panopto subtitles</p>
     </div>
   </header>
 
   <div class="row">
-    <span class="label">Show subtitles</span>
+    <span class="label" data-i18n="showSubtitles">Show subtitles</span>
     <input type="checkbox" id="enabled">
   </div>
 
   <div class="row">
-    <label for="displayMode">Mode</label>
-    <select id="displayMode">
-      <option value="bilingual">Bilingual</option>
-      <option value="translation">Translation only</option>
-      <option value="original">Original only</option>
+    <label for="interfaceLanguage" data-i18n="interfaceLanguage">Interface</label>
+    <select id="interfaceLanguage">
+      <option value="en" data-i18n="languageEnglish">English</option>
+      <option value="zh-CN" data-i18n="languageChinese">中文</option>
     </select>
   </div>
 
   <div class="row">
-    <label for="subtitlePosition">Position</label>
-    <select id="subtitlePosition">
-      <option value="auto">Auto</option>
-      <option value="video-bottom">Video bottom</option>
-      <option value="page-bottom">Page bottom</option>
-      <option value="follow-caption">Follow caption</option>
+    <label for="displayMode" data-i18n="mode">Mode</label>
+    <select id="displayMode">
+      <option value="bilingual" data-i18n="displayBilingual">Bilingual</option>
+      <option value="translation" data-i18n="displayTranslation">Translation only</option>
+      <option value="original" data-i18n="displayOriginal">Original only</option>
     </select>
   </div>
 
-  <button id="openOptions" type="button">Open settings</button>
+  <div class="row">
+    <label for="subtitlePosition" data-i18n="position">Position</label>
+    <select id="subtitlePosition">
+      <option value="auto" data-i18n="positionAuto">Auto</option>
+      <option value="video-bottom" data-i18n="positionVideoBottom">Video bottom</option>
+      <option value="page-bottom" data-i18n="positionPageBottom">Page bottom</option>
+      <option value="follow-caption" data-i18n="positionFollowCaptionShort">Follow caption</option>
+    </select>
+  </div>
+
+  <button id="openOptions" type="button" data-i18n="openSettings">Open settings</button>
 
   <script src="popup.js"></script>
 </body>

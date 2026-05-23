@@ -16,6 +16,7 @@
 
   const DEFAULT_SETTINGS = {
     enabled: true,
+    interfaceLanguage: navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en',
     targetLanguage: 'zh-CN',
     displayMode: 'bilingual',
     subtitlePosition: 'auto',
