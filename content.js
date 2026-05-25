@@ -10,9 +10,11 @@
   const TRANSLATED_ID = 'pansub-translated';
   const SETTINGS_KEY = 'pansubSettings';
   const CACHE_KEY = 'pansubCache';
-  const DEBOUNCE_MS = 600;
+  const DEBOUNCE_MS = 150;
   const POLL_MS = 500;
   const CACHE_LIMIT = 500;
+  const MAX_GLOSSARY_MATCHES = 8;
+  const GLOSSARY = window.PANSUB_GLOSSARY || { version: 'none', terms: [] };
 
   const DEFAULT_SETTINGS = {
     enabled: true,
@@ -25,6 +27,7 @@
     maxWidth: 80,
     backgroundOpacity: 76,
     hideNativeCaptions: false,
+    glossaryEnabled: true,
     cacheEnabled: true,
     debugLogs: true,
     floatingButtonEnabled: true,
@@ -310,8 +313,85 @@
     applyOverlayPosition(activeCaption);
   }
 
+  function glossarySupported() {
+    return settings.glossaryEnabled
+      && settings.targetLanguage.startsWith('zh')
+      && Array.isArray(GLOSSARY.terms)
+      && GLOSSARY.terms.length > 0;
+  }
+
+  function glossaryTarget(entry) {
+    if (settings.targetLanguage === 'zh-TW') {
+      return entry.zhTW || entry.zhCN || entry.zh || '';
+    }
+    return entry.zhCN || entry.zh || entry.zhTW || '';
+  }
+
+  function escapeRegExp(text) {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function termPattern(term) {
+    return new RegExp(`(^|[^A-Za-z0-9])(${escapeRegExp(term)})(?=$|[^A-Za-z0-9])`, 'gi');
+  }
+
+  function glossaryCandidates() {
+    const candidates = [];
+    for (const entry of GLOSSARY.terms) {
+      const target = glossaryTarget(entry);
+      if (!target) continue;
+      const terms = Array.isArray(entry.terms) ? entry.terms : [entry.term];
+      for (const term of terms) {
+        if (typeof term === 'string' && term.trim().length > 1) {
+          candidates.push({ term: term.trim(), target });
+        }
+      }
+    }
+    return candidates.sort((a, b) => b.term.length - a.term.length);
+  }
+
+  function protectGlossaryTerms(text) {
+    if (!glossarySupported()) {
+      return { text, replacements: [] };
+    }
+
+    let protectedText = text;
+    const replacements = [];
+    const matchedTerms = new Set();
+
+    for (const candidate of glossaryCandidates()) {
+      if (replacements.length >= MAX_GLOSSARY_MATCHES) break;
+      const normalized = candidate.term.toLowerCase();
+      if (matchedTerms.has(normalized)) continue;
+
+      let found = false;
+      protectedText = protectedText.replace(termPattern(candidate.term), (match, prefix) => {
+        if (found) return match;
+        found = true;
+        matchedTerms.add(normalized);
+        const placeholder = `PANSUBTERM${replacements.length}`;
+        replacements.push({ placeholder, target: candidate.target, term: candidate.term });
+        return `${prefix}${placeholder}`;
+      });
+    }
+
+    if (replacements.length) {
+      debug('[PanSub] glossary terms:', replacements.map((item) => item.term).join(', '));
+    }
+    return { text: protectedText, replacements };
+  }
+
+  function restoreGlossaryTerms(text, replacements) {
+    let restored = text;
+    for (const { placeholder, target } of replacements) {
+      restored = restored.replace(new RegExp(placeholder, 'gi'), target);
+    }
+    return restored;
+  }
+
   function cacheKey(text) {
-    return `${settings.targetLanguage}::${text}`;
+    const glossaryVersion = glossarySupported() ? `glossary-${GLOSSARY.version}` : 'plain';
+    return `${settings.targetLanguage}::${glossaryVersion}::${text}`;
   }
 
   function loadPersistentCache(stored) {
@@ -352,7 +432,8 @@
   }
 
   async function requestTranslation(text) {
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${encodeURIComponent(settings.targetLanguage)}&dt=t&q=${encodeURIComponent(text)}`;
+    const prepared = protectGlossaryTerms(text);
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${encodeURIComponent(settings.targetLanguage)}&dt=t&q=${encodeURIComponent(prepared.text)}`;
     try {
       const resp = await fetch(url);
       if (!resp.ok) {
@@ -366,7 +447,7 @@
           if (seg && typeof seg[0] === 'string') translated += seg[0];
         }
       }
-      translated = translated.trim();
+      translated = restoreGlossaryTerms(translated.trim(), prepared.replacements);
       if (!translated) {
         console.warn('[PanSub] empty translation result:', data);
         return '';

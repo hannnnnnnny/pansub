@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   maxWidth: 80,
   backgroundOpacity: 76,
   hideNativeCaptions: false,
+  glossaryEnabled: true,
   cacheEnabled: true,
   debugLogs: true,
   floatingButtonEnabled: true,
