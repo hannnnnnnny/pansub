@@ -18,7 +18,11 @@ const DEFAULT_SETTINGS = {
   floatingButtonEnabled: true,
   floatingButtonSide: 'right',
   floatingButtonOpacity: 78,
-  floatingButtonHoverOnly: false
+  floatingButtonHoverOnly: false,
+  floatingButtonX: null,
+  floatingButtonY: null,
+  floatingButtonSmall: false,
+  floatingButtonDisabledHosts: []
 };
 
 const I18N = {
@@ -29,7 +33,7 @@ const I18N = {
     navGeneral: 'General',
     navSubtitles: 'Subtitles',
     navTranslation: 'Translation',
-    navFloating: 'Quick Button',
+    navFloating: 'Quick Controls',
     navDebug: 'Debug',
     eyebrow: 'Settings',
     pageTitle: 'Lecture subtitle controls',
@@ -71,17 +75,23 @@ const I18N = {
     academicGlossaryHelp: 'Protect common academic terms across business, arts, IT, science, law, and more.',
     localCache: 'Local translation cache',
     localCacheHelp: 'Reuse translated lines during the same course recording.',
-    quickButtonTitle: 'Quick Button',
-    quickButtonDescription: 'Add a small page-side control for turning PanSub on or off while watching.',
+    quickButtonTitle: 'Quick Controls',
+    quickButtonDescription: 'Add a draggable page-side panel for subtitle mode, language, hiding, and settings while watching.',
     samplePage: 'Panopto lecture recording',
     showQuickButton: 'Show quick button',
-    showQuickButtonHelp: 'Display a small PanSub button on matching Panopto pages.',
+    showQuickButtonHelp: 'Display a draggable PanSub button on matching Panopto pages.',
+    compactQuickButton: 'Compact quick button',
+    compactQuickButtonHelp: 'Use a smaller button when the player area is crowded.',
     fadeUntilHover: 'Fade until hover',
     fadeUntilHoverHelp: 'Keep the button quiet until your cursor moves over it.',
     side: 'Side',
     sideRight: 'Right',
     sideLeft: 'Left',
     collapsedOpacity: 'Collapsed opacity',
+    resetQuickButtonPosition: 'Reset button position',
+    disabledSites: 'Sites where the button is hidden',
+    disabledSitesHelp: 'One hostname per line. Remove a hostname to show the button there again.',
+    clearDisabledSites: 'Clear hidden sites',
     debugTitle: 'Debug',
     debugDescription: 'Useful when Panopto changes its player markup.',
     consoleDiagnostics: 'Console diagnostics',
@@ -96,7 +106,7 @@ const I18N = {
     navGeneral: '常规',
     navSubtitles: '字幕',
     navTranslation: '翻译',
-    navFloating: '快捷按钮',
+    navFloating: '快捷控制',
     navDebug: '调试',
     eyebrow: '设置',
     pageTitle: '课程字幕控制',
@@ -138,17 +148,23 @@ const I18N = {
     academicGlossaryHelp: '保护商科、艺术、IT、科学、法律等领域的常见学术术语。',
     localCache: '本地翻译缓存',
     localCacheHelp: '重复字幕会复用缓存，减少同一录像中的重复请求。',
-    quickButtonTitle: '快捷按钮',
-    quickButtonDescription: '在页面侧边显示一个小按钮，观看时快速开关 PanSub。',
+    quickButtonTitle: '快捷控制',
+    quickButtonDescription: '在页面侧边显示一个可拖动小面板，观看时快速调整字幕模式、语言、隐藏和设置。',
     samplePage: 'Panopto 课程录像',
     showQuickButton: '显示快捷按钮',
-    showQuickButtonHelp: '在匹配的 Panopto 页面上显示 PanSub 小按钮。',
+    showQuickButtonHelp: '在匹配的 Panopto 页面上显示可拖动的 PanSub 小按钮。',
+    compactQuickButton: '紧凑快捷按钮',
+    compactQuickButtonHelp: '播放器空间紧张时使用更小的悬浮球。',
     fadeUntilHover: '悬停前淡化',
     fadeUntilHoverHelp: '鼠标移上去之前，让按钮保持低调显示。',
     side: '位置',
     sideRight: '右侧',
     sideLeft: '左侧',
     collapsedOpacity: '收起透明度',
+    resetQuickButtonPosition: '重置按钮位置',
+    disabledSites: '已隐藏悬浮球的网站',
+    disabledSitesHelp: '每行一个 hostname。删除某一行即可恢复该网站的悬浮球。',
+    clearDisabledSites: '清空隐藏网站',
     debugTitle: '调试',
     debugDescription: '当 Panopto 更改播放器结构时用于排查问题。',
     consoleDiagnostics: '控制台诊断',
@@ -175,7 +191,8 @@ const controls = {
   floatingButtonEnabled: document.getElementById('floatingButtonEnabled'),
   floatingButtonSide: document.getElementById('floatingButtonSide'),
   floatingButtonOpacity: document.getElementById('floatingButtonOpacity'),
-  floatingButtonHoverOnly: document.getElementById('floatingButtonHoverOnly')
+  floatingButtonHoverOnly: document.getElementById('floatingButtonHoverOnly'),
+  floatingButtonSmall: document.getElementById('floatingButtonSmall')
 };
 
 const outputs = {
@@ -189,6 +206,7 @@ const outputs = {
 let settings = { ...DEFAULT_SETTINGS };
 let saveTimer = null;
 const toast = document.getElementById('saved');
+const disabledHostsInput = document.getElementById('floatingButtonDisabledHosts');
 
 function currentLanguage() {
   return settings.interfaceLanguage === 'zh-CN' ? 'zh-CN' : 'en';
@@ -225,6 +243,11 @@ function render() {
     }
   }
   renderOutputs();
+  if (disabledHostsInput) {
+    disabledHostsInput.value = Array.isArray(settings.floatingButtonDisabledHosts)
+      ? settings.floatingButtonDisabledHosts.join('\n')
+      : '';
+  }
   applyTranslations();
 }
 
@@ -248,11 +271,22 @@ function readSettings() {
       next[key] = control.value;
     }
   }
+  if (disabledHostsInput) {
+    next.floatingButtonDisabledHosts = disabledHostsInput.value
+      .split(/\r?\n/)
+      .map((host) => host.trim().toLowerCase())
+      .filter(Boolean);
+  }
   return next;
 }
 
 function scheduleSave() {
-  settings = readSettings();
+  const next = readSettings();
+  if (next.floatingButtonSide !== settings.floatingButtonSide) {
+    next.floatingButtonX = null;
+    next.floatingButtonY = null;
+  }
+  settings = next;
   renderOutputs();
   applyTranslations();
   if (saveTimer) clearTimeout(saveTimer);
@@ -280,10 +314,36 @@ chrome.storage.local.get([SETTINGS_KEY, 'pansubEnabled'], (result) => {
 for (const control of Object.values(controls)) {
   if (control) control.addEventListener('input', scheduleSave);
 }
+if (disabledHostsInput) disabledHostsInput.addEventListener('input', scheduleSave);
 
 document.getElementById('reset').addEventListener('click', () => {
   const interfaceLanguage = settings.interfaceLanguage;
   settings = { ...DEFAULT_SETTINGS, interfaceLanguage };
+  render();
+  chrome.storage.local.set({
+    [SETTINGS_KEY]: settings,
+    pansubEnabled: settings.enabled
+  }, showSaved);
+});
+
+document.getElementById('resetFloatingPosition').addEventListener('click', () => {
+  settings = {
+    ...settings,
+    floatingButtonX: null,
+    floatingButtonY: null
+  };
+  render();
+  chrome.storage.local.set({
+    [SETTINGS_KEY]: settings,
+    pansubEnabled: settings.enabled
+  }, showSaved);
+});
+
+document.getElementById('clearDisabledSites').addEventListener('click', () => {
+  settings = {
+    ...settings,
+    floatingButtonDisabledHosts: []
+  };
   render();
   chrome.storage.local.set({
     [SETTINGS_KEY]: settings,

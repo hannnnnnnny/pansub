@@ -18,7 +18,7 @@
         <a href="#general" data-i18n="navGeneral">General</a>
         <a href="#subtitles" data-i18n="navSubtitles">Subtitles</a>
         <a href="#translation" data-i18n="navTranslation">Translation</a>
-        <a href="#floating" data-i18n="navFloating">Quick Button</a>
+        <a href="#floating" data-i18n="navFloating">Quick Controls</a>
         <a href="#debug" data-i18n="navDebug">Debug</a>
       </nav>
     </aside>
@@ -148,8 +148,8 @@
 
       <section id="floating" class="group">
         <div class="group-title">
-          <h3 data-i18n="quickButtonTitle">Quick Button</h3>
-          <p data-i18n="quickButtonDescription">Add a small page-side control for turning PanSub on or off while watching.</p>
+          <h3 data-i18n="quickButtonTitle">Quick Controls</h3>
+          <p data-i18n="quickButtonDescription">Add a draggable page-side panel for subtitle mode, language, hiding, and settings while watching.</p>
         </div>
         <div class="preview floating-preview">
           <div class="sample-page">
@@ -163,6 +163,13 @@
             <small data-i18n="showQuickButtonHelp">Display a small PanSub button on matching Panopto pages.</small>
           </span>
           <input id="floatingButtonEnabled" type="checkbox">
+        </label>
+        <label class="switch-row">
+          <span>
+            <strong data-i18n="compactQuickButton">Compact quick button</strong>
+            <small data-i18n="compactQuickButtonHelp">Use a smaller button when the player area is crowded.</small>
+          </span>
+          <input id="floatingButtonSmall" type="checkbox">
         </label>
         <label class="switch-row">
           <span>
@@ -185,6 +192,13 @@
             <output id="floatingButtonOpacityValue"></output>
           </label>
         </div>
+        <button id="resetFloatingPosition" type="button" class="secondary-action" data-i18n="resetQuickButtonPosition">Reset button position</button>
+        <label class="field">
+          <span data-i18n="disabledSites">Sites where the button is hidden</span>
+          <textarea id="floatingButtonDisabledHosts" rows="3" spellcheck="false"></textarea>
+          <small data-i18n="disabledSitesHelp">One hostname per line. Remove a hostname to show the button there again.</small>
+        </label>
+        <button id="clearDisabledSites" type="button" class="secondary-action" data-i18n="clearDisabledSites">Clear hidden sites</button>
       </section>
 
       <section id="debug" class="group">

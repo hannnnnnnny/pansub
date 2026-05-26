@@ -126,6 +126,10 @@ button:hover {
   color: var(--accent);
 }
 
+.secondary-action {
+  margin-top: 16px;
+}
+
 .group {
   margin-bottom: 18px;
   padding: 24px;
@@ -179,6 +183,18 @@ select {
   padding: 10px 12px;
   background: #fff;
   color: var(--ink);
+}
+
+textarea {
+  width: 100%;
+  min-height: 84px;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
 }
 
 input[type="checkbox"] {

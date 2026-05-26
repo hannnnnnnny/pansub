@@ -18,7 +18,11 @@ const DEFAULT_SETTINGS = {
   floatingButtonEnabled: true,
   floatingButtonSide: 'right',
   floatingButtonOpacity: 78,
-  floatingButtonHoverOnly: false
+  floatingButtonHoverOnly: false,
+  floatingButtonX: null,
+  floatingButtonY: null,
+  floatingButtonSmall: false,
+  floatingButtonDisabledHosts: []
 };
 
 const I18N = {

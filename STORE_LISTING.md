@@ -61,7 +61,11 @@ Features:
 - Position modes for on-video captions and docked Panopto captions
 - Adjustable subtitle size, overlay width, and background opacity
 - Optional hiding of native Panopto captions when they overlap
-- Floating quick button for turning PanSub on or off while watching
+- Draggable floating quick controls with compact mode, temporary hide, per-site hide, global disable, and position reset
+- Fullscreen support for PanSub subtitles and controls inside the Panopto player
+- Stable subtitle anchoring reduces per-line jumping when captions reflow
+- Player-area anchoring keeps subtitles centered on the actual video, even with sidebars or DevTools open
+- Protects PanSub overlays and Panopto caption nodes from browser page translation when possible
 - Local translation cache for repeated caption lines
 - Debug logs for checking which Panopto caption element was detected
 
@@ -120,7 +124,7 @@ Publish automatically after review: Off for staged review, On if you want immedi
 Extension package:
 
 ```text
-dist/pansub-1.1.3.zip
+dist/pansub-1.1.12.zip
 ```
 
 Icon:
@@ -213,7 +217,11 @@ Features:
 - Position modes for on-video captions and docked Panopto captions
 - Adjustable subtitle size, overlay width, and background opacity
 - Optional hiding of native Panopto captions when they overlap
-- Floating quick button for turning PanSub on or off while watching
+- Draggable floating quick controls with compact mode, temporary hide, per-site hide, global disable, and position reset
+- Fullscreen support for PanSub subtitles and controls inside the Panopto player
+- Stable subtitle anchoring reduces per-line jumping when captions reflow
+- Player-area anchoring keeps subtitles centered on the actual video, even with sidebars or DevTools open
+- Protects PanSub overlays and Panopto caption nodes from browser page translation when possible
 - Local translation cache for repeated caption lines
 - Debug logs for checking which Panopto caption element was detected
 
