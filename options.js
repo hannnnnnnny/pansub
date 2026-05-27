@@ -120,6 +120,7 @@ const I18N = {
     borderColor: 'Border color',
     lockSubtitleBox: 'Lock subtitle box',
     lockSubtitleBoxHelp: 'When locked, the subtitle box keeps its position and cannot be dragged.',
+    resetSubtitlePosition: 'Reset subtitle box position',
     translationSize: 'Translation size',
     originalSize: 'Original size',
     overlayWidth: 'Overlay width',
@@ -213,6 +214,7 @@ const I18N = {
     borderColor: '边框颜色',
     lockSubtitleBox: '锁定字幕框',
     lockSubtitleBoxHelp: '锁定后，字幕框保持当前位置，不能再被拖动。',
+    resetSubtitlePosition: '重置字幕框位置',
     translationSize: '译文字号',
     originalSize: '原文字号',
     overlayWidth: '悬浮层宽度',
@@ -448,6 +450,20 @@ document.getElementById('resetFloatingPosition').addEventListener('click', () =>
     ...settings,
     floatingButtonX: null,
     floatingButtonY: null
+  };
+  render();
+  chrome.storage.local.set({
+    [SETTINGS_KEY]: settings,
+    pansubEnabled: settings.enabled
+  }, showSaved);
+});
+
+document.getElementById('resetSubtitlePosition').addEventListener('click', () => {
+  settings = {
+    ...settings,
+    subtitlePosition: 'auto',
+    overlayManualX: null,
+    overlayManualY: null
   };
   render();
   chrome.storage.local.set({
