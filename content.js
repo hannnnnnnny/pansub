@@ -206,6 +206,13 @@
     return rect;
   }
 
+  function captionRect(el) {
+    if (!el || !isVisible(el)) return null;
+    const rect = el.getBoundingClientRect();
+    if (rect.width < 80 || rect.height < 10) return null;
+    return rect;
+  }
+
   function viewportRect() {
     return {
       left: 0,
@@ -280,7 +287,47 @@
       }
     }
 
+    const fallback = findFallbackCaptionElement();
+    if (fallback) return fallback;
+
     return null;
+  }
+
+  function findFallbackCaptionElement() {
+    const player = playerRect();
+    const candidates = [];
+    document.querySelectorAll('[id*="caption" i], [class*="caption" i], [aria-label*="caption" i]').forEach((el) => {
+      if (el.id === OVERLAY_ID || el.closest?.(`#${OVERLAY_ID}, #${FLOATING_ID}, #${FLOATING_PANEL_ID}, #${FLOATING_SETTINGS_ID}`)) return;
+      if (/^(button|select|option|input|textarea)$/i.test(el.tagName)) return;
+
+      const text = el.textContent.trim();
+      if (text.length < 2 || text.length > 420 || text.split(/\r?\n/).length > 3) return;
+
+      const rect = captionRect(el);
+      if (!rect) return;
+
+      const horizontalOverlap = Math.min(rect.right, player.right) - Math.max(rect.left, player.left);
+      const nearPlayerVertically = rect.bottom >= player.top - 24
+        && rect.top <= player.bottom + Math.max(120, player.height * 0.24);
+      if (!nearPlayerVertically || horizontalOverlap < Math.min(rect.width, player.width) * 0.35) return;
+
+      const insidePlayer = rect.top >= player.top - 4 && rect.bottom <= player.bottom + 4;
+      const mode = rect.top > player.bottom - 8 ? 'docked' : 'overlay';
+      const bottomDistance = Math.abs(player.bottom - rect.bottom);
+      candidates.push({
+        el,
+        mode,
+        selector: 'fallback-caption',
+        score: horizontalOverlap + (insidePlayer ? 120 : 0) - bottomDistance / 4
+      });
+    });
+
+    const best = candidates.sort((a, b) => b.score - a.score)[0];
+    if (best) {
+      protectCaptionElement(best.el);
+      debug('[PanSub] Found fallback caption element:', best.el);
+    }
+    return best || null;
   }
 
   function createOverlay() {
