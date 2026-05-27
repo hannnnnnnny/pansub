@@ -16,7 +16,10 @@
   const CACHE_KEY = 'pansubCache';
   const DEBOUNCE_MS = 150;
   const POLL_MS = 500;
-  const CACHE_LIMIT = 500;
+  const CACHE_LIMIT = 2000;
+  const TRANSLATE_MIN_INTERVAL_MS = 350;
+  const TRANSLATE_RETRY_DELAYS = [1500, 3000, 6000];
+  const POST_TEXT_LENGTH = 320;
   const MAX_GLOSSARY_MATCHES = 8;
   const FLOATING_REGULAR_SIZE = 44;
   const FLOATING_SMALL_SIZE = 34;
@@ -64,6 +67,8 @@
   let debounceTimer = null;
   let persistTimer = null;
   let translateSeq = 0;
+  let lastTranslateAt = 0;
+  let translateBackoffUntil = 0;
   let overlayEl = null;
   let floatingEl = null;
   let floatingPanelEl = null;
@@ -1855,6 +1860,55 @@
     return restored;
   }
 
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function waitForTranslateSlot() {
+    const now = Date.now();
+    const throttleWait = Math.max(0, TRANSLATE_MIN_INTERVAL_MS - (now - lastTranslateAt));
+    const backoffWait = Math.max(0, translateBackoffUntil - now);
+    const wait = Math.max(throttleWait, backoffWait);
+    if (wait > 0) {
+      await sleep(wait);
+    }
+    lastTranslateAt = Date.now();
+  }
+
+  function translationParams(text) {
+    return new URLSearchParams({
+      client: 'gtx',
+      sl: 'en',
+      tl: settings.targetLanguage,
+      dt: 't',
+      q: text
+    });
+  }
+
+  async function fetchTranslationData(text) {
+    await waitForTranslateSlot();
+    const params = translationParams(text);
+    const baseUrl = 'https://translate.googleapis.com/translate_a/single';
+    const usePost = text.length > POST_TEXT_LENGTH;
+    return fetch(usePost ? baseUrl : `${baseUrl}?${params.toString()}`, usePost ? {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+      },
+      body: params.toString()
+    } : undefined);
+  }
+
+  function flattenTranslation(data) {
+    let translated = '';
+    if (data && Array.isArray(data[0])) {
+      for (const seg of data[0]) {
+        if (seg && typeof seg[0] === 'string') translated += seg[0];
+      }
+    }
+    return translated.trim();
+  }
+
   function cacheKey(text) {
     const glossaryVersion = glossarySupported() ? `glossary-${GLOSSARY.version}` : 'plain';
     return `${settings.targetLanguage}::${glossaryVersion}::${text}`;
@@ -1899,30 +1953,32 @@
 
   async function requestTranslation(text) {
     const prepared = protectGlossaryTerms(text);
-    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${encodeURIComponent(settings.targetLanguage)}&dt=t&q=${encodeURIComponent(prepared.text)}`;
-    try {
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        console.warn(`[PanSub] translation API returned ${resp.status}`);
-        return '';
-      }
-      const data = await resp.json();
-      let translated = '';
-      if (data && Array.isArray(data[0])) {
-        for (const seg of data[0]) {
-          if (seg && typeof seg[0] === 'string') translated += seg[0];
+    for (let attempt = 0; attempt <= TRANSLATE_RETRY_DELAYS.length; attempt += 1) {
+      try {
+        const resp = await fetchTranslationData(prepared.text);
+        if (!resp.ok) {
+          console.warn(`[PanSub] translation API returned ${resp.status}`);
+          if (resp.status < 500 && resp.status !== 429) {
+            return '';
+          }
+        } else {
+          const data = await resp.json();
+          const translated = restoreGlossaryTerms(flattenTranslation(data), prepared.replacements);
+          if (translated) {
+            return translated;
+          }
+          console.warn('[PanSub] empty translation result:', data);
         }
+      } catch (err) {
+        console.error('[PanSub] translation failed:', err);
       }
-      translated = restoreGlossaryTerms(translated.trim(), prepared.replacements);
-      if (!translated) {
-        console.warn('[PanSub] empty translation result:', data);
-        return '';
-      }
-      return translated;
-    } catch (err) {
-      console.error('[PanSub] translation failed:', err);
-      return '';
+
+      const delay = TRANSLATE_RETRY_DELAYS[attempt];
+      if (!delay) break;
+      translateBackoffUntil = Date.now() + delay;
+      await sleep(delay);
     }
+    return '';
   }
 
   function applyNativeCaptionVisibility(caption) {
