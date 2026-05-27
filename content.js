@@ -492,7 +492,9 @@
       hideSite: '此网站隐藏',
       disableGlobal: '全部页面关闭',
       resetPosition: '重置位置',
-      buttonControlsNote: '隐藏后的悬浮球可以在 PanSub 设置页恢复。'
+      buttonControlsNote: '隐藏后的悬浮球可以在 PanSub 设置页恢复。',
+      lockSubtitleBox: '锁定字幕框',
+      unlockSubtitleBox: '解锁字幕框'
     }
   };
 
