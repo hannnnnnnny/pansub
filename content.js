@@ -1953,6 +1953,18 @@
     return translated;
   }
 
+  async function refreshCurrentTranslation() {
+    const text = lastOriginalText;
+    if (!text || sourceLooksTranslated(text) || settings.displayMode === 'original') return;
+
+    const currentSeq = ++translateSeq;
+    updateOverlay(text, '');
+    const translated = await translate(text);
+    if (translated && currentSeq === translateSeq && text === lastOriginalText) {
+      updateOverlay(text, translated);
+    }
+  }
+
   async function requestTranslation(text) {
     const prepared = protectGlossaryTerms(text);
     for (let attempt = 0; attempt <= TRANSLATE_RETRY_DELAYS.length; attempt += 1) {
@@ -2084,15 +2096,25 @@
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
     if (changes[SETTINGS_KEY] || changes.pansubEnabled) {
+      const previousSettings = { ...settings };
       const nextSettings = changes[SETTINGS_KEY]?.newValue || settings;
       const nextEnabled = changes.pansubEnabled?.newValue;
       mergeSettings(nextSettings, nextEnabled);
+      const shouldRetranslate = previousSettings.targetLanguage !== settings.targetLanguage
+        || previousSettings.glossaryEnabled !== settings.glossaryEnabled
+        || previousSettings.displayMode !== settings.displayMode;
+      if (shouldRetranslate) {
+        lastTranslatedText = '';
+      }
       applyVisibility();
       applyOverlayStyle();
       applyFloatingButtonStyle();
       mountExtensionElements();
       applyNativeCaptionVisibility(activeCaption);
       updateOverlay(lastOriginalText, lastTranslatedText);
+      if (shouldRetranslate) {
+        refreshCurrentTranslation();
+      }
     }
     if (changes[CACHE_KEY]) {
       translationCache.clear();
