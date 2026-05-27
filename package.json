@@ -7,6 +7,8 @@
   "scripts": {
     "check": "node --check content.js && node --check options.js && node --check popup.js && node --check background.js",
     "package:zip": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-extension.ps1",
+    "test": "npm run check && npm run test:smoke && npm run test:options",
+    "test:options": "node tests/options-smoke.js",
     "test:smoke": "node tests/extension-smoke.js"
   },
   "devDependencies": {
