@@ -1970,7 +1970,15 @@
         translationCache.set(key, value);
       }
     }
+    pruneTranslationCache();
     debug(`[PanSub] loaded ${translationCache.size} cached translations`);
+  }
+
+  function pruneTranslationCache() {
+    while (translationCache.size > CACHE_LIMIT) {
+      const oldestKey = translationCache.keys().next().value;
+      translationCache.delete(oldestKey);
+    }
   }
 
   function scheduleCachePersist() {
@@ -1995,6 +2003,7 @@
     const translated = await requestTranslation(text);
     if (translated) {
       translationCache.set(key, translated);
+      pruneTranslationCache();
       scheduleCachePersist();
     }
     return translated;
