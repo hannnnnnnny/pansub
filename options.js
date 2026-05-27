@@ -23,7 +23,7 @@ const DEFAULT_SETTINGS = {
   hideNativeCaptions: false,
   glossaryEnabled: true,
   cacheEnabled: true,
-  debugLogs: true,
+  debugLogs: false,
   floatingButtonEnabled: true,
   floatingButtonSide: 'right',
   floatingButtonOpacity: 78,
