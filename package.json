@@ -1,6 +1,6 @@
 {
   "name": "pansub",
-  "version": "1.1.13",
+  "version": "1.1.14",
   "private": true,
   "description": "Chrome extension for real-time Panopto subtitle translation.",
   "type": "commonjs",
