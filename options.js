@@ -1,4 +1,5 @@
 const SETTINGS_KEY = 'pansubSettings';
+const CACHE_KEY = 'pansubCache';
 const DEFAULT_INTERFACE_LANGUAGE = navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
 
 const DEFAULT_SETTINGS = {
@@ -136,6 +137,7 @@ const I18N = {
     academicGlossaryHelp: 'Protect common academic terms across business, arts, IT, science, law, and more.',
     localCache: 'Local translation cache',
     localCacheHelp: 'Reuse translated lines during the same course recording.',
+    clearTranslationCache: 'Clear translation cache',
     quickButtonTitle: 'Quick Controls',
     quickButtonDescription: 'Add a draggable page-side panel for subtitle mode, language, hiding, and settings while watching.',
     samplePage: 'Panopto lecture recording',
@@ -228,6 +230,7 @@ const I18N = {
     academicGlossaryHelp: '保护商科、艺术、IT、科学、法律等领域的常见学术术语。',
     localCache: '本地翻译缓存',
     localCacheHelp: '重复字幕会复用缓存，减少同一录像中的重复请求。',
+    clearTranslationCache: '清空翻译缓存',
     quickButtonTitle: '快捷控制',
     quickButtonDescription: '在页面侧边显示一个可拖动小面板，观看时快速调整字幕模式、语言、隐藏和设置。',
     samplePage: 'Panopto 课程录像',
@@ -463,4 +466,8 @@ document.getElementById('clearDisabledSites').addEventListener('click', () => {
     [SETTINGS_KEY]: settings,
     pansubEnabled: settings.enabled
   }, showSaved);
+});
+
+document.getElementById('clearTranslationCache').addEventListener('click', () => {
+  chrome.storage.local.remove(CACHE_KEY, showSaved);
 });

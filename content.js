@@ -2092,5 +2092,9 @@
       applyNativeCaptionVisibility(activeCaption);
       updateOverlay(lastOriginalText, lastTranslatedText);
     }
+    if (changes[CACHE_KEY]) {
+      translationCache.clear();
+      loadPersistentCache(changes[CACHE_KEY].newValue);
+    }
   });
 })();
