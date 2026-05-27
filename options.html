@@ -82,7 +82,58 @@
             <option value="video-bottom" data-i18n="positionVideoBottom">Video bottom</option>
             <option value="page-bottom" data-i18n="positionPageBottom">Page bottom</option>
             <option value="follow-caption" data-i18n="positionFollowCaption">Follow caption element</option>
+            <option value="manual" data-i18n="positionManual">Manual drag</option>
           </select>
+        </label>
+
+        <div class="grid">
+          <label class="field">
+            <span data-i18n="stylePreset">Style preset</span>
+            <select id="overlayTheme">
+              <option value="classic" data-i18n="styleClassic">Classic dark</option>
+              <option value="glass" data-i18n="styleGlass">Soft glass</option>
+              <option value="light" data-i18n="styleLight">Light card</option>
+              <option value="midnight" data-i18n="styleMidnight">Midnight blue</option>
+              <option value="outline" data-i18n="styleOutline">Outlined</option>
+            </select>
+          </label>
+          <label class="field">
+            <span data-i18n="fontFamily">Font family</span>
+            <select id="overlayFontFamily">
+              <option value="system" data-i18n="fontSystem">System</option>
+              <option value="sans" data-i18n="fontSans">Clean sans</option>
+              <option value="serif" data-i18n="fontSerif">Serif</option>
+              <option value="mono" data-i18n="fontMono">Mono</option>
+              <option value="rounded" data-i18n="fontRounded">Rounded</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid color-grid">
+          <label class="field color-field">
+            <span data-i18n="translationColor">Translation color</span>
+            <input id="subtitleColor" type="color">
+          </label>
+          <label class="field color-field">
+            <span data-i18n="originalColor">Original color</span>
+            <input id="originalColor" type="color">
+          </label>
+          <label class="field color-field">
+            <span data-i18n="boxColor">Box color</span>
+            <input id="overlayBackgroundColor" type="color">
+          </label>
+          <label class="field color-field">
+            <span data-i18n="borderColor">Border color</span>
+            <input id="overlayBorderColor" type="color">
+          </label>
+        </div>
+
+        <label class="switch-row">
+          <span>
+            <strong data-i18n="lockSubtitleBox">Lock subtitle box</strong>
+            <small data-i18n="lockSubtitleBoxHelp">When locked, the subtitle box keeps its position and cannot be dragged.</small>
+          </span>
+          <input id="overlayLocked" type="checkbox">
         </label>
 
         <div class="grid">

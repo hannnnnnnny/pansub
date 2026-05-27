@@ -10,6 +10,8 @@
   const FLOATING_SETTINGS_ID = 'pansub-floating-settings';
   const ORIGINAL_ID = 'pansub-original';
   const TRANSLATED_ID = 'pansub-translated';
+  const OVERLAY_TOOLBAR_ID = 'pansub-overlay-toolbar';
+  const OVERLAY_LOCK_ID = 'pansub-overlay-lock';
   const SETTINGS_KEY = 'pansubSettings';
   const CACHE_KEY = 'pansubCache';
   const DEBOUNCE_MS = 150;
@@ -31,6 +33,15 @@
     originalFontSize: 15,
     maxWidth: 80,
     backgroundOpacity: 76,
+    overlayTheme: 'classic',
+    overlayFontFamily: 'system',
+    subtitleColor: '#ffffff',
+    originalColor: '#dbeafe',
+    overlayBackgroundColor: '#000000',
+    overlayBorderColor: '#ffffff',
+    overlayLocked: false,
+    overlayManualX: null,
+    overlayManualY: null,
     hideNativeCaptions: false,
     glossaryEnabled: true,
     cacheEnabled: true,
@@ -59,6 +70,7 @@
   let floatingPanelOpen = false;
   let floatingSettingsOpen = false;
   let floatingDrag = null;
+  let overlayDrag = null;
   let suppressFloatingClick = false;
   let floatingButtonSessionHidden = false;
   let activeCaption = null;
@@ -268,12 +280,16 @@
   function createOverlay() {
     if (document.getElementById(OVERLAY_ID)) {
       overlayEl = document.getElementById(OVERLAY_ID);
+      ensureOverlayToolbar();
+      attachOverlayDragListeners();
       return;
     }
 
     overlayEl = document.createElement('div');
     overlayEl.id = OVERLAY_ID;
     markNoTranslate(overlayEl);
+
+    const toolbar = createOverlayToolbar();
 
     const original = document.createElement('div');
     original.id = ORIGINAL_ID;
@@ -283,9 +299,11 @@
     translated.id = TRANSLATED_ID;
     markNoTranslate(translated);
 
+    overlayEl.appendChild(toolbar);
     overlayEl.appendChild(original);
     overlayEl.appendChild(translated);
     extensionHost().appendChild(overlayEl);
+    attachOverlayDragListeners();
 
     applyVisibility();
     applyOverlayStyle();
@@ -296,6 +314,61 @@
       window.addEventListener('resize', () => applyOverlayPosition(activeCaption));
       window.addEventListener('scroll', () => applyOverlayPosition(activeCaption), true);
     }
+  }
+
+  function createOverlayToolbar() {
+    const toolbar = document.createElement('div');
+    toolbar.id = OVERLAY_TOOLBAR_ID;
+    toolbar.dataset.pansubPart = 'overlayToolbar';
+    markNoTranslate(toolbar);
+
+    const grip = document.createElement('span');
+    grip.dataset.pansubPart = 'overlayGrip';
+    grip.textContent = 'PanSub';
+
+    const lock = document.createElement('button');
+    lock.id = OVERLAY_LOCK_ID;
+    lock.type = 'button';
+    lock.dataset.pansubAction = 'overlayLock';
+    lock.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      settings = { ...settings, overlayLocked: !settings.overlayLocked };
+      saveSettings();
+      updateOverlayLockButton();
+      applyOverlayStyle();
+    });
+
+    toolbar.append(grip, lock);
+    return toolbar;
+  }
+
+  function ensureOverlayToolbar() {
+    if (!overlayEl) return;
+    if (!document.getElementById(OVERLAY_TOOLBAR_ID)) {
+      overlayEl.prepend(createOverlayToolbar());
+    }
+    updateOverlayLockButton();
+  }
+
+  function lockIcon(locked) {
+    const body = locked
+      ? '<rect x="7" y="10" width="10" height="8" rx="1.5"></rect><path d="M9 10V8a3 3 0 0 1 6 0v2"></path>'
+      : '<rect x="7" y="10" width="10" height="8" rx="1.5"></rect><path d="M9 10V8a3 3 0 0 1 5.2-2"></path>';
+    return `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">${body}</svg>`;
+  }
+
+  function updateOverlayLockButton() {
+    const lock = document.getElementById(OVERLAY_LOCK_ID);
+    if (!lock) return;
+    const locked = Boolean(settings.overlayLocked);
+    lock.innerHTML = lockIcon(locked);
+    lock.title = quickCopy(locked ? 'unlockSubtitleBox' : 'lockSubtitleBox');
+    lock.setAttribute('aria-label', lock.title);
+    lock.setAttribute('aria-pressed', String(locked));
+    lock.querySelectorAll('svg').forEach((svg) => {
+      svg.style.cssText = 'width: 15px;height: 15px;fill: none;stroke: currentColor;stroke-width: 2;stroke-linecap: round;stroke-linejoin: round;';
+    });
   }
 
   function createFloatingButton() {
@@ -385,7 +458,9 @@
       hideSite: 'Hide on this site',
       disableGlobal: 'Turn off everywhere',
       resetPosition: 'Reset position',
-      buttonControlsNote: 'Hidden buttons can be restored from the PanSub settings page.'
+      buttonControlsNote: 'Hidden buttons can be restored from the PanSub settings page.',
+      lockSubtitleBox: 'Lock subtitle box',
+      unlockSubtitleBox: 'Unlock subtitle box'
     },
     'zh-CN': {
       title: 'PanSub',
@@ -422,6 +497,212 @@
 
   function setStyles(el, styles) {
     Object.assign(el.style, styles);
+  }
+
+  function normalizeHexColor(value, fallback) {
+    const color = String(value || '').trim();
+    return /^#[0-9a-f]{6}$/i.test(color) ? color : fallback;
+  }
+
+  function hexToRgb(value, fallback) {
+    const color = normalizeHexColor(value, fallback);
+    return [
+      parseInt(color.slice(1, 3), 16),
+      parseInt(color.slice(3, 5), 16),
+      parseInt(color.slice(5, 7), 16)
+    ];
+  }
+
+  function rgbaFromHex(value, alpha, fallback = '#000000') {
+    const [r, g, b] = hexToRgb(value, fallback);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function themeDefaultColor(key) {
+    const theme = settings.overlayTheme || 'classic';
+    const defaults = {
+      classic: {
+        subtitleColor: '#ffffff',
+        originalColor: '#dbeafe',
+        overlayBackgroundColor: '#000000',
+        overlayBorderColor: '#ffffff'
+      },
+      glass: {
+        subtitleColor: '#ffffff',
+        originalColor: '#c7d2fe',
+        overlayBackgroundColor: '#111827',
+        overlayBorderColor: '#93c5fd'
+      },
+      light: {
+        subtitleColor: '#111827',
+        originalColor: '#475569',
+        overlayBackgroundColor: '#ffffff',
+        overlayBorderColor: '#cbd5e1'
+      },
+      midnight: {
+        subtitleColor: '#f8fafc',
+        originalColor: '#bfdbfe',
+        overlayBackgroundColor: '#0f172a',
+        overlayBorderColor: '#38bdf8'
+      },
+      outline: {
+        subtitleColor: '#ffffff',
+        originalColor: '#e2e8f0',
+        overlayBackgroundColor: '#000000',
+        overlayBorderColor: '#ffffff'
+      }
+    };
+    return defaults[theme]?.[key] || DEFAULT_SETTINGS[key];
+  }
+
+  function overlayColor(key) {
+    return normalizeHexColor(settings[key], themeDefaultColor(key));
+  }
+
+  function overlayFontFamily() {
+    const fonts = {
+      system: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif',
+      sans: 'Arial, Helvetica, "PingFang SC", "Microsoft YaHei", sans-serif',
+      serif: 'Georgia, "Times New Roman", "Songti SC", SimSun, serif',
+      mono: '"Cascadia Mono", Consolas, "SFMono-Regular", Menlo, monospace',
+      rounded: '"Trebuchet MS", "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif'
+    };
+    return fonts[settings.overlayFontFamily] || fonts.system;
+  }
+
+  function overlayThemeCss(alpha) {
+    const theme = settings.overlayTheme || 'classic';
+    const backgroundColor = overlayColor('overlayBackgroundColor');
+    const borderColor = overlayColor('overlayBorderColor');
+    const base = {
+      background: rgbaFromHex(backgroundColor, alpha),
+      border: `1px solid ${rgbaFromHex(borderColor, theme === 'outline' ? 0.62 : 0.16, '#ffffff')}`,
+      boxShadow: '0 8px 24px rgba(0,0,0,0.28)',
+      backdropFilter: 'none'
+    };
+
+    if (theme === 'glass') {
+      return {
+        ...base,
+        background: rgbaFromHex(backgroundColor, Math.min(0.82, Math.max(0.32, alpha))),
+        border: `1px solid ${rgbaFromHex(borderColor, 0.28, '#93c5fd')}`,
+        boxShadow: '0 18px 38px rgba(15,23,42,0.38)',
+        backdropFilter: 'blur(12px) saturate(1.2)'
+      };
+    }
+
+    if (theme === 'light') {
+      return {
+        ...base,
+        background: rgbaFromHex(backgroundColor, Math.max(0.82, alpha), '#ffffff'),
+        border: `1px solid ${rgbaFromHex(borderColor, 0.78, '#cbd5e1')}`,
+        boxShadow: '0 12px 28px rgba(15,23,42,0.16)'
+      };
+    }
+
+    if (theme === 'midnight') {
+      return {
+        ...base,
+        background: rgbaFromHex(backgroundColor, Math.min(0.92, Math.max(0.58, alpha)), '#0f172a'),
+        border: `1px solid ${rgbaFromHex(borderColor, 0.34, '#38bdf8')}`,
+        boxShadow: '0 14px 34px rgba(2,6,23,0.48)'
+      };
+    }
+
+    if (theme === 'outline') {
+      return {
+        ...base,
+        background: rgbaFromHex(backgroundColor, Math.min(0.72, Math.max(0.36, alpha)), '#000000'),
+        border: `2px solid ${rgbaFromHex(borderColor, 0.7, '#ffffff')}`,
+        boxShadow: '0 0 0 1px rgba(0,0,0,0.38), 0 12px 30px rgba(0,0,0,0.34)'
+      };
+    }
+
+    return base;
+  }
+
+  function attachOverlayDragListeners() {
+    if (!overlayEl || overlayEl.dataset.pansubDragReady === 'true') return;
+    overlayEl.dataset.pansubDragReady = 'true';
+    overlayEl.addEventListener('pointerdown', startOverlayDrag);
+  }
+
+  function hasManualOverlayPosition() {
+    return Number.isFinite(settings.overlayManualX) && Number.isFinite(settings.overlayManualY);
+  }
+
+  function clampOverlayTopLeft(left, top) {
+    const width = overlayEl.offsetWidth || 240;
+    const height = overlayEl.offsetHeight || overlayReservedHeight();
+    return {
+      left: clamp(left, 8, Math.max(8, window.innerWidth - width - 8)),
+      top: clamp(top, 8, Math.max(8, window.innerHeight - height - 8))
+    };
+  }
+
+  function startOverlayDrag(event) {
+    if (!overlayEl || settings.overlayLocked) return;
+    if (event.button !== 0 && event.pointerType !== 'touch') return;
+    if (event.target.closest?.(`#${OVERLAY_LOCK_ID}, button, select, input, textarea, a`)) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = overlayEl.getBoundingClientRect();
+    const currentWidth = rect.width;
+    overlayDrag = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+      width: currentWidth
+    };
+    overlayEl.style.width = `${Math.round(currentWidth)}px`;
+    overlayEl.style.maxWidth = `${Math.round(currentWidth)}px`;
+    overlayEl.style.transition = 'none';
+    overlayEl.setPointerCapture?.(event.pointerId);
+    overlayEl.dataset.pansubDragging = 'true';
+    window.addEventListener('pointermove', moveOverlayDrag, true);
+    window.addEventListener('pointerup', finishOverlayDrag, true);
+    window.addEventListener('pointercancel', finishOverlayDrag, true);
+  }
+
+  function moveOverlayDrag(event) {
+    if (!overlayDrag || !overlayEl) return;
+    if (event.pointerId !== overlayDrag.pointerId) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    const next = clampOverlayTopLeft(
+      event.clientX - overlayDrag.offsetX,
+      event.clientY - overlayDrag.offsetY
+    );
+    overlayEl.style.left = `${Math.round(next.left + (overlayDrag.width || overlayEl.offsetWidth || 0) / 2)}px`;
+    overlayEl.style.top = `${Math.round(next.top)}px`;
+    overlayEl.style.bottom = 'auto';
+    overlayEl.style.transform = 'translateX(-50%)';
+  }
+
+  function finishOverlayDrag(event) {
+    if (!overlayDrag || !overlayEl) return;
+    if (event.pointerId !== overlayDrag.pointerId) return;
+
+    window.removeEventListener('pointermove', moveOverlayDrag, true);
+    window.removeEventListener('pointerup', finishOverlayDrag, true);
+    window.removeEventListener('pointercancel', finishOverlayDrag, true);
+    overlayEl.releasePointerCapture?.(event.pointerId);
+    overlayEl.dataset.pansubDragging = 'false';
+    overlayDrag = null;
+
+    const rect = overlayEl.getBoundingClientRect();
+    settings = {
+      ...settings,
+      subtitlePosition: 'manual',
+      overlayManualX: clamp((rect.left + rect.width / 2) / Math.max(window.innerWidth, 1), 0, 1),
+      overlayManualY: clamp(rect.top / Math.max(window.innerHeight, 1), 0, 1)
+    };
+    saveSettings(() => {
+      applyOverlayStyle();
+      applyOverlayPosition(activeCaption);
+    });
   }
 
   function createFloatingPanel() {
@@ -798,7 +1079,10 @@
 
   function applyVisibility() {
     if (!overlayEl) return;
-    overlayEl.style.display = settings.enabled ? 'block' : 'none';
+    const hasVisibleSubtitle = settings.displayMode !== 'translation'
+      || Boolean(lastTranslatedText)
+      || sourceLooksTranslated(lastOriginalText);
+    overlayEl.style.display = settings.enabled && hasVisibleSubtitle ? 'block' : 'none';
   }
 
   function applyFloatingButtonStyle() {
@@ -1142,11 +1426,51 @@
   }
 
   function overlayReservedHeight() {
-    const originalLine = Math.ceil(clamp(settings.originalFontSize, 10, 24) * 1.35);
-    const translationLine = Math.ceil(clamp(settings.fontSize, 14, 42) * 1.35);
-    if (settings.displayMode === 'original') return originalLine + 20;
-    if (settings.displayMode === 'translation') return translationLine * 2 + 20;
-    return originalLine + translationLine * 2 + 24;
+    const originalLine = Math.ceil(clamp(settings.originalFontSize, 10, 24) * 1.22);
+    const translationLine = Math.ceil(clamp(settings.fontSize, 14, 42) * 1.22);
+    if (settings.displayMode === 'original') return originalLine + 14;
+    if (settings.displayMode === 'translation') return translationLine + 16;
+    return originalLine + translationLine + 18;
+  }
+
+  function textVisualWeight(text) {
+    return Array.from(String(text || '')).reduce((weight, char) => {
+      if (/\s/.test(char)) return weight + 0.35;
+      if (/[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(char)) return weight + 1.08;
+      return weight + 0.66;
+    }, 0);
+  }
+
+  function adaptiveOverlayWidth(rect, baseMaxWidth) {
+    const textWeight = Math.max(
+      textVisualWeight(lastTranslatedText),
+      textVisualWeight(lastOriginalText)
+    );
+    const adaptivePercent = textWeight > 54
+      ? 98
+      : textWeight > 36
+        ? 96
+        : textWeight > 22
+          ? 92
+          : baseMaxWidth;
+    const viewportAllowance = Math.max(220, window.innerWidth - 24);
+    const viewportWidth = textWeight > 54
+      ? viewportAllowance * 0.98
+      : textWeight > 36
+        ? viewportAllowance * 0.96
+        : textWeight > 22
+          ? viewportAllowance * 0.92
+          : 0;
+    const adaptiveCap = textWeight > 54
+      ? 1400
+      : textWeight > 36
+        ? 1280
+        : textWeight > 22
+          ? 1120
+          : 760;
+    const maxPercent = Math.max(baseMaxWidth, adaptivePercent);
+    const playerWidth = rect.width * (maxPercent / 100);
+    return Math.max(220, Math.min(Math.max(playerWidth, viewportWidth), adaptiveCap, viewportAllowance));
   }
 
   function applyOverlayStyle() {
@@ -1155,57 +1479,123 @@
     const alpha = clamp(settings.backgroundOpacity, 0, 100) / 100;
     const maxWidth = clamp(settings.maxWidth, 40, 96);
     const rect = playerRect();
-    const widthPx = Math.max(240, Math.min(rect.width * (maxWidth / 100), 920));
+    const widthPx = adaptiveOverlayWidth(rect, maxWidth);
+    const themeCss = overlayThemeCss(alpha);
+    const subtitleColor = overlayColor('subtitleColor');
+    const originalColor = overlayColor('originalColor');
     const currentLeft = overlayEl.style.left || '50%';
     const currentTop = overlayEl.style.top || 'auto';
     const currentBottom = overlayEl.style.bottom || '80px';
     const currentTransform = overlayEl.style.transform || 'translateX(-50%)';
     overlayEl.style.cssText = [
       'position: fixed',
-      `width: ${widthPx}px`,
-      'max-width: calc(100vw - 32px)',
+      'width: fit-content',
+      'min-width: 180px',
+      `max-width: min(calc(100vw - 32px), ${Math.round(widthPx)}px)`,
       `left: ${currentLeft}`,
       `top: ${currentTop}`,
       `bottom: ${currentBottom}`,
       `transform: ${currentTransform}`,
       `min-height: ${overlayReservedHeight()}px`,
       'box-sizing: border-box',
-      `background: rgba(0,0,0,${alpha})`,
-      'color: #fff',
-      'padding: 10px 16px',
+      `background: ${themeCss.background}`,
+      `border: ${themeCss.border}`,
+      `box-shadow: ${themeCss.boxShadow}`,
+      `backdrop-filter: ${themeCss.backdropFilter}`,
+      `-webkit-backdrop-filter: ${themeCss.backdropFilter}`,
+      `color: ${subtitleColor}`,
+      'padding: 8px 14px',
       'border-radius: 8px',
       'z-index: 2147483647',
-      'pointer-events: none',
+      'pointer-events: auto',
       'text-align: center',
-      'font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif',
+      `font-family: ${overlayFontFamily()}`,
       'line-height: 1.35',
-      'box-shadow: 0 8px 24px rgba(0,0,0,0.28)'
+      settings.overlayLocked ? 'cursor: default' : 'cursor: move',
+      overlayDrag ? 'transition: none' : 'transition: box-shadow .16s ease, border-color .16s ease, background .16s ease',
+      'touch-action: none',
+      'user-select: none'
     ].join(';');
+
+    const toolbar = document.getElementById(OVERLAY_TOOLBAR_ID);
+    if (toolbar) {
+      toolbar.style.cssText = [
+        'display: flex',
+        'align-items: center',
+        'justify-content: flex-end',
+        'gap: 8px',
+        'height: 0',
+        'margin: -2px -6px 0',
+        'opacity: .82',
+        'pointer-events: auto'
+      ].join(';');
+    }
+
+    overlayEl.querySelectorAll('[data-pansub-part="overlayGrip"]').forEach((el) => {
+      el.style.cssText = [
+        'display: none',
+        'font-size: 10px',
+        'font-weight: 800',
+        'letter-spacing: .08em',
+        'text-transform: uppercase',
+        `color: ${originalColor}`,
+        'opacity: .82'
+      ].join(';');
+    });
+
+    const lock = document.getElementById(OVERLAY_LOCK_ID);
+    if (lock) {
+      lock.style.cssText = [
+        'display: grid',
+        'place-items: center',
+        'width: 22px',
+        'height: 22px',
+        'border: 1px solid rgba(148,163,184,.28)',
+        'border-radius: 7px',
+        'padding: 0',
+        'background: rgba(15,23,42,.28)',
+        `color: ${subtitleColor}`,
+        'cursor: pointer',
+        'pointer-events: auto',
+        'transform: translate(10px, -10px)'
+      ].join(';');
+      lock.querySelectorAll('svg').forEach((svg) => {
+        svg.style.cssText = 'width: 15px;height: 15px;fill: none;stroke: currentColor;stroke-width: 2;stroke-linecap: round;stroke-linejoin: round;';
+      });
+    }
 
     const original = document.getElementById(ORIGINAL_ID);
     const translated = document.getElementById(TRANSLATED_ID);
     if (original) {
       original.style.cssText = [
         `font-size: ${clamp(settings.originalFontSize, 10, 24)}px`,
-        `min-height: ${Math.ceil(clamp(settings.originalFontSize, 10, 24) * 1.35)}px`,
-        'opacity: 0.72',
-        'margin-bottom: 4px'
+        `min-height: ${Math.ceil(clamp(settings.originalFontSize, 10, 24) * 1.18)}px`,
+        `color: ${originalColor}`,
+        'opacity: 0.86',
+        'margin-bottom: 2px'
       ].join(';');
     }
     if (translated) {
       translated.style.cssText = [
         `font-size: ${clamp(settings.fontSize, 14, 42)}px`,
-        `min-height: ${Math.ceil(clamp(settings.fontSize, 14, 42) * 1.35 * (settings.displayMode === 'bilingual' ? 2 : 1))}px`,
+        `min-height: ${Math.ceil(clamp(settings.fontSize, 14, 42) * 1.18)}px`,
         'font-weight: 650',
-        'color: #fff'
+        `color: ${subtitleColor}`
       ].join(';');
     }
+    updateOverlayLockButton();
   }
 
   function applyOverlayPosition(caption) {
     if (!overlayEl) return;
+    if (overlayDrag) return;
 
     const position = settings.subtitlePosition;
+    if (position === 'manual' && hasManualOverlayPosition()) {
+      setManualOverlayPosition('manual');
+      return;
+    }
+
     const inFullscreen = Boolean(fullscreenElement());
     if (inFullscreen) {
       setPlayerBottom(position === 'page-bottom' ? 32 : 80, 'fullscreen-lock');
@@ -1233,6 +1623,26 @@
       return;
     }
     setPlayerBottom(120, 'auto-docked');
+  }
+
+  function setManualOverlayPosition(reason) {
+    const overlayWidth = overlayEl.offsetWidth || 240;
+    const overlayHeight = overlayEl.offsetHeight || overlayReservedHeight();
+    const centerX = clamp(
+      settings.overlayManualX * window.innerWidth,
+      overlayWidth / 2 + 8,
+      window.innerWidth - overlayWidth / 2 - 8
+    );
+    const top = clamp(
+      settings.overlayManualY * window.innerHeight,
+      8,
+      Math.max(8, window.innerHeight - overlayHeight - 8)
+    );
+    overlayEl.style.top = `${Math.round(top)}px`;
+    overlayEl.style.bottom = 'auto';
+    overlayEl.style.left = `${Math.round(centerX)}px`;
+    overlayEl.style.transform = 'translateX(-50%)';
+    traceOverlayPosition(reason);
   }
 
   function overlayRectSnapshot() {
@@ -1283,7 +1693,9 @@
     const top = clamp(rect.bottom - safeBottom - overlayHeight, minTop, maxTop);
     overlayEl.style.top = `${Math.round(top)}px`;
     overlayEl.style.bottom = 'auto';
-    overlayEl.style.left = `${Math.round(centerX)}px`;
+    const overlayWidth = overlayEl.offsetWidth || 240;
+    const safeCenterX = clamp(centerX, overlayWidth / 2 + 8, window.innerWidth - overlayWidth / 2 - 8);
+    overlayEl.style.left = `${Math.round(safeCenterX)}px`;
     overlayEl.style.transform = 'translateX(-50%)';
     traceOverlayPosition(reason, {
       player: {
@@ -1322,10 +1734,13 @@
     document.getElementById(TRANSLATED_ID)?.setAttribute('lang', settings.targetLanguage);
     lastOriginalText = originalText;
     lastTranslatedText = translatedText;
+    applyVisibility();
 
     const original = document.getElementById(ORIGINAL_ID);
     const translated = document.getElementById(TRANSLATED_ID);
-    applyOverlayStyle();
+    if (!overlayDrag) {
+      applyOverlayStyle();
+    }
 
     if (settings.displayMode === 'original') {
       if (original) {
@@ -1343,8 +1758,8 @@
         original.style.display = 'none';
       }
       if (translated) {
-        translated.textContent = translatedText || originalText;
-        translated.style.display = 'block';
+        translated.textContent = translatedText || '\u00a0';
+        translated.style.display = translatedText ? 'block' : 'none';
       }
     } else {
       if (original) {
@@ -1358,7 +1773,9 @@
       }
     }
 
-    applyOverlayPosition(activeCaption);
+    if (!overlayDrag) {
+      applyOverlayPosition(activeCaption);
+    }
   }
 
   function glossarySupported() {

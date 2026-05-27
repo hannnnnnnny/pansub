@@ -11,6 +11,15 @@ const DEFAULT_SETTINGS = {
   originalFontSize: 15,
   maxWidth: 80,
   backgroundOpacity: 76,
+  overlayTheme: 'classic',
+  overlayFontFamily: 'system',
+  subtitleColor: '#ffffff',
+  originalColor: '#dbeafe',
+  overlayBackgroundColor: '#000000',
+  overlayBorderColor: '#ffffff',
+  overlayLocked: false,
+  overlayManualX: null,
+  overlayManualY: null,
   hideNativeCaptions: false,
   glossaryEnabled: true,
   cacheEnabled: true,
@@ -44,6 +53,7 @@ const I18N = {
     positionVideoBottom: 'Video bottom',
     positionPageBottom: 'Page bottom',
     positionFollowCaptionShort: 'Follow caption',
+    positionManual: 'Manual drag',
     openSettings: 'Open settings'
   },
   'zh-CN': {
@@ -64,6 +74,7 @@ const I18N = {
     positionVideoBottom: '视频底部',
     positionPageBottom: '页面底部',
     positionFollowCaptionShort: '跟随字幕',
+    positionManual: '手动拖动',
     openSettings: '打开设置'
   }
 };

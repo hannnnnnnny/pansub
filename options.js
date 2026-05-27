@@ -11,6 +11,15 @@ const DEFAULT_SETTINGS = {
   originalFontSize: 15,
   maxWidth: 80,
   backgroundOpacity: 76,
+  overlayTheme: 'classic',
+  overlayFontFamily: 'system',
+  subtitleColor: '#ffffff',
+  originalColor: '#dbeafe',
+  overlayBackgroundColor: '#000000',
+  overlayBorderColor: '#ffffff',
+  overlayLocked: false,
+  overlayManualX: null,
+  overlayManualY: null,
   hideNativeCaptions: false,
   glossaryEnabled: true,
   cacheEnabled: true,
@@ -23,6 +32,39 @@ const DEFAULT_SETTINGS = {
   floatingButtonY: null,
   floatingButtonSmall: false,
   floatingButtonDisabledHosts: []
+};
+
+const THEME_COLOR_DEFAULTS = {
+  classic: {
+    subtitleColor: '#ffffff',
+    originalColor: '#dbeafe',
+    overlayBackgroundColor: '#000000',
+    overlayBorderColor: '#ffffff'
+  },
+  glass: {
+    subtitleColor: '#ffffff',
+    originalColor: '#c7d2fe',
+    overlayBackgroundColor: '#111827',
+    overlayBorderColor: '#93c5fd'
+  },
+  light: {
+    subtitleColor: '#111827',
+    originalColor: '#475569',
+    overlayBackgroundColor: '#ffffff',
+    overlayBorderColor: '#cbd5e1'
+  },
+  midnight: {
+    subtitleColor: '#f8fafc',
+    originalColor: '#bfdbfe',
+    overlayBackgroundColor: '#0f172a',
+    overlayBorderColor: '#38bdf8'
+  },
+  outline: {
+    subtitleColor: '#ffffff',
+    originalColor: '#e2e8f0',
+    overlayBackgroundColor: '#000000',
+    overlayBorderColor: '#ffffff'
+  }
 };
 
 const I18N = {
@@ -58,6 +100,25 @@ const I18N = {
     positionVideoBottom: 'Video bottom',
     positionPageBottom: 'Page bottom',
     positionFollowCaption: 'Follow caption element',
+    positionManual: 'Manual drag',
+    stylePreset: 'Style preset',
+    styleClassic: 'Classic dark',
+    styleGlass: 'Soft glass',
+    styleLight: 'Light card',
+    styleMidnight: 'Midnight blue',
+    styleOutline: 'Outlined',
+    fontFamily: 'Font family',
+    fontSystem: 'System',
+    fontSans: 'Clean sans',
+    fontSerif: 'Serif',
+    fontMono: 'Mono',
+    fontRounded: 'Rounded',
+    translationColor: 'Translation color',
+    originalColor: 'Original color',
+    boxColor: 'Box color',
+    borderColor: 'Border color',
+    lockSubtitleBox: 'Lock subtitle box',
+    lockSubtitleBoxHelp: 'When locked, the subtitle box keeps its position and cannot be dragged.',
     translationSize: 'Translation size',
     originalSize: 'Original size',
     overlayWidth: 'Overlay width',
@@ -131,6 +192,25 @@ const I18N = {
     positionVideoBottom: '视频底部',
     positionPageBottom: '页面底部',
     positionFollowCaption: '跟随字幕元素',
+    positionManual: '手动拖动',
+    stylePreset: '样式预设',
+    styleClassic: '经典深色',
+    styleGlass: '柔和玻璃',
+    styleLight: '浅色卡片',
+    styleMidnight: '深蓝夜间',
+    styleOutline: '描边样式',
+    fontFamily: '字体',
+    fontSystem: '系统字体',
+    fontSans: '清爽无衬线',
+    fontSerif: '衬线字体',
+    fontMono: '等宽字体',
+    fontRounded: '圆润字体',
+    translationColor: '译文颜色',
+    originalColor: '原文颜色',
+    boxColor: '字幕框颜色',
+    borderColor: '边框颜色',
+    lockSubtitleBox: '锁定字幕框',
+    lockSubtitleBoxHelp: '锁定后，字幕框保持当前位置，不能再被拖动。',
     translationSize: '译文字号',
     originalSize: '原文字号',
     overlayWidth: '悬浮层宽度',
@@ -184,6 +264,13 @@ const controls = {
   originalFontSize: document.getElementById('originalFontSize'),
   maxWidth: document.getElementById('maxWidth'),
   backgroundOpacity: document.getElementById('backgroundOpacity'),
+  overlayTheme: document.getElementById('overlayTheme'),
+  overlayFontFamily: document.getElementById('overlayFontFamily'),
+  subtitleColor: document.getElementById('subtitleColor'),
+  originalColor: document.getElementById('originalColor'),
+  overlayBackgroundColor: document.getElementById('overlayBackgroundColor'),
+  overlayBorderColor: document.getElementById('overlayBorderColor'),
+  overlayLocked: document.getElementById('overlayLocked'),
   hideNativeCaptions: document.getElementById('hideNativeCaptions'),
   glossaryEnabled: document.getElementById('glossaryEnabled'),
   cacheEnabled: document.getElementById('cacheEnabled'),
@@ -259,6 +346,12 @@ function renderOutputs() {
   outputs.floatingButtonOpacity.textContent = `${settings.floatingButtonOpacity}%`;
 }
 
+function renderColorControls() {
+  ['subtitleColor', 'originalColor', 'overlayBackgroundColor', 'overlayBorderColor'].forEach((key) => {
+    if (controls[key]) controls[key].value = settings[key];
+  });
+}
+
 function readSettings() {
   const next = { ...settings };
   for (const [key, control] of Object.entries(controls)) {
@@ -280,14 +373,35 @@ function readSettings() {
   return next;
 }
 
+function sameColor(a, b) {
+  return String(a || '').toLowerCase() === String(b || '').toLowerCase();
+}
+
+function applyThemeColors(next) {
+  if (next.overlayTheme === settings.overlayTheme) return next;
+
+  const colorKeys = ['subtitleColor', 'originalColor', 'overlayBackgroundColor', 'overlayBorderColor'];
+  const previousDefaults = THEME_COLOR_DEFAULTS[settings.overlayTheme] || THEME_COLOR_DEFAULTS.classic;
+  const nextDefaults = THEME_COLOR_DEFAULTS[next.overlayTheme] || THEME_COLOR_DEFAULTS.classic;
+  const themed = { ...next };
+
+  for (const key of colorKeys) {
+    if (!settings[key] || sameColor(settings[key], previousDefaults[key])) {
+      themed[key] = nextDefaults[key];
+    }
+  }
+  return themed;
+}
+
 function scheduleSave() {
-  const next = readSettings();
+  const next = applyThemeColors(readSettings());
   if (next.floatingButtonSide !== settings.floatingButtonSide) {
     next.floatingButtonX = null;
     next.floatingButtonY = null;
   }
   settings = next;
   renderOutputs();
+  renderColorControls();
   applyTranslations();
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
