@@ -63,6 +63,7 @@
   let lastTranslatedText = '';
   let debounceTimer = null;
   let persistTimer = null;
+  let translateSeq = 0;
   let overlayEl = null;
   let floatingEl = null;
   let floatingPanelEl = null;
@@ -1951,6 +1952,7 @@
     const text = caption.el.textContent.trim();
     if (!text || text === lastText) return;
     lastText = text;
+    const currentSeq = ++translateSeq;
     debug(`[PanSub] New caption(${caption.mode}): ${text}`);
 
     if (sourceLooksTranslated(text)) {
@@ -1966,8 +1968,10 @@
     if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       const translated = await translate(text);
-      if (translated) {
+      if (translated && currentSeq === translateSeq && text === lastText) {
         updateOverlay(text, translated);
+      } else if (translated) {
+        debug('[PanSub] stale translation ignored:', text);
       }
     }, DEBOUNCE_MS);
   }
