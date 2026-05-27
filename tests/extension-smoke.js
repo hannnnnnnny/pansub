@@ -94,12 +94,14 @@ async function installChromeMock(page) {
 async function main() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+  const translationRequests = [];
 
   await page.route('https://translate.googleapis.com/**', async (route) => {
     const request = route.request();
     const params = new URLSearchParams(request.postData() || new URL(request.url()).searchParams.toString());
     const source = params.get('q') || '';
     const targetLanguage = params.get('tl') || 'zh-CN';
+    translationRequests.push({ source, targetLanguage });
     const translated = targetLanguage === 'ja'
       ? '二番目のデータベース字幕'
       : source.includes('second')
@@ -159,6 +161,23 @@ async function main() {
     window.chrome.storage.local.set({ pansubSettings: next, pansubEnabled: true });
   });
   await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('二番目のデータベース字幕'));
+
+  const requestsBeforeDisable = translationRequests.length;
+  await page.evaluate(() => {
+    const next = {
+      ...window.__pansubStore.pansubSettings,
+      enabled: false,
+      hideNativeCaptions: true
+    };
+    window.chrome.storage.local.set({ pansubSettings: next, pansubEnabled: false });
+    document.querySelector('#overlayCaption').textContent = 'third database caption';
+  });
+  await page.waitForTimeout(700);
+  assert.strictEqual(translationRequests.length, requestsBeforeDisable, 'disabled PanSub should not send translation requests');
+  const overlayDisplay = await page.locator('#pansub-overlay').evaluate((el) => getComputedStyle(el).display);
+  assert.strictEqual(overlayDisplay, 'none', 'disabled PanSub should hide its overlay');
+  const nativeOpacity = await page.locator('#overlayCaption').evaluate((el) => el.style.opacity);
+  assert.notStrictEqual(nativeOpacity, '0', 'disabled PanSub should not hide native captions');
 
   await browser.close();
   console.log('PanSub extension smoke test passed');

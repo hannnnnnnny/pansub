@@ -2002,7 +2002,7 @@
     nativeCaptionEl = caption?.el || null;
     if (!nativeCaptionEl) return;
 
-    if (settings.hideNativeCaptions) {
+    if (settings.enabled && settings.hideNativeCaptions) {
       nativeCaptionEl.style.setProperty('opacity', '0', 'important');
     } else {
       nativeCaptionEl.style.removeProperty('opacity');
@@ -2018,6 +2018,15 @@
     protectCaptionElement(caption.el);
     applyNativeCaptionVisibility(caption);
     applyOverlayPosition(caption);
+
+    if (!settings.enabled) {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      translateSeq += 1;
+      lastText = '';
+      lastTranslatedText = '';
+      applyVisibility();
+      return;
+    }
 
     const text = caption.el.textContent.trim();
     if (!text || text === lastText) return;
