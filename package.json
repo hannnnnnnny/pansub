@@ -7,8 +7,9 @@
   "scripts": {
     "check": "node --check content.js && node --check options.js && node --check popup.js && node --check background.js",
     "package:zip": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package-extension.ps1",
-    "test": "npm run check && npm run test:smoke && npm run test:caption-fallback && npm run test:options",
+    "test": "npm run check && npm run test:smoke && npm run test:caption-fallback && npm run test:glossary && npm run test:options",
     "test:caption-fallback": "node tests/caption-fallback-smoke.js",
+    "test:glossary": "node tests/glossary-smoke.js",
     "test:options": "node tests/options-smoke.js",
     "test:smoke": "node tests/extension-smoke.js"
   },
