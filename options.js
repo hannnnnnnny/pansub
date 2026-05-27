@@ -300,6 +300,32 @@ let saveTimer = null;
 const toast = document.getElementById('saved');
 const disabledHostsInput = document.getElementById('floatingButtonDisabledHosts');
 
+function storageErrorMessage() {
+  return chrome.runtime?.lastError?.message || '';
+}
+
+function saveToStorage(payload, callback = showSaved) {
+  chrome.storage.local.set(payload, () => {
+    const message = storageErrorMessage();
+    if (message) {
+      console.warn('[PanSub] settings save failed:', message);
+      return;
+    }
+    callback?.();
+  });
+}
+
+function removeFromStorage(key, callback = showSaved) {
+  chrome.storage.local.remove(key, () => {
+    const message = storageErrorMessage();
+    if (message) {
+      console.warn('[PanSub] storage remove failed:', message);
+      return;
+    }
+    callback?.();
+  });
+}
+
 function currentLanguage() {
   return settings.interfaceLanguage === 'zh-CN' ? 'zh-CN' : 'en';
 }
@@ -410,10 +436,10 @@ function scheduleSave() {
   applyTranslations();
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    chrome.storage.local.set({
+    saveToStorage({
       [SETTINGS_KEY]: settings,
       pansubEnabled: settings.enabled
-    }, showSaved);
+    });
   }, 150);
 }
 
@@ -439,10 +465,10 @@ document.getElementById('reset').addEventListener('click', () => {
   const interfaceLanguage = settings.interfaceLanguage;
   settings = { ...DEFAULT_SETTINGS, interfaceLanguage };
   render();
-  chrome.storage.local.set({
+  saveToStorage({
     [SETTINGS_KEY]: settings,
     pansubEnabled: settings.enabled
-  }, showSaved);
+  });
 });
 
 document.getElementById('resetFloatingPosition').addEventListener('click', () => {
@@ -452,10 +478,10 @@ document.getElementById('resetFloatingPosition').addEventListener('click', () =>
     floatingButtonY: null
   };
   render();
-  chrome.storage.local.set({
+  saveToStorage({
     [SETTINGS_KEY]: settings,
     pansubEnabled: settings.enabled
-  }, showSaved);
+  });
 });
 
 document.getElementById('resetSubtitlePosition').addEventListener('click', () => {
@@ -466,10 +492,10 @@ document.getElementById('resetSubtitlePosition').addEventListener('click', () =>
     overlayManualY: null
   };
   render();
-  chrome.storage.local.set({
+  saveToStorage({
     [SETTINGS_KEY]: settings,
     pansubEnabled: settings.enabled
-  }, showSaved);
+  });
 });
 
 document.getElementById('clearDisabledSites').addEventListener('click', () => {
@@ -478,12 +504,12 @@ document.getElementById('clearDisabledSites').addEventListener('click', () => {
     floatingButtonDisabledHosts: []
   };
   render();
-  chrome.storage.local.set({
+  saveToStorage({
     [SETTINGS_KEY]: settings,
     pansubEnabled: settings.enabled
-  }, showSaved);
+  });
 });
 
 document.getElementById('clearTranslationCache').addEventListener('click', () => {
-  chrome.storage.local.remove(CACHE_KEY, showSaved);
+  removeFromStorage(CACHE_KEY);
 });

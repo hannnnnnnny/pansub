@@ -88,6 +88,10 @@ const openOptions = document.getElementById('openOptions');
 
 let settings = { ...DEFAULT_SETTINGS };
 
+function storageErrorMessage() {
+  return chrome.runtime?.lastError?.message || '';
+}
+
 function currentLanguage() {
   return settings.interfaceLanguage === 'zh-CN' ? 'zh-CN' : 'en';
 }
@@ -127,7 +131,14 @@ function save() {
   chrome.storage.local.set({
     [SETTINGS_KEY]: settings,
     pansubEnabled: settings.enabled
-  }, render);
+  }, () => {
+    const message = storageErrorMessage();
+    if (message) {
+      console.warn('[PanSub] popup save failed:', message);
+      return;
+    }
+    render();
+  });
 }
 
 chrome.storage.local.get([SETTINGS_KEY, 'pansubEnabled'], (result) => {
@@ -144,5 +155,10 @@ displayMode.addEventListener('change', save);
 subtitlePosition.addEventListener('change', save);
 
 openOptions.addEventListener('click', () => {
-  chrome.runtime.openOptionsPage();
+  chrome.runtime.openOptionsPage(() => {
+    const message = storageErrorMessage();
+    if (message) {
+      chrome.runtime.sendMessage?.({ type: 'PANSUB_OPEN_OPTIONS' });
+    }
+  });
 });

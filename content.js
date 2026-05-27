@@ -104,7 +104,13 @@
     chrome.storage.local.set({
       [SETTINGS_KEY]: settings,
       pansubEnabled: settings.enabled
-    }, callback);
+    }, () => {
+      const error = chrome.runtime?.lastError;
+      if (error) {
+        console.warn('[PanSub] failed to save settings:', error.message);
+      }
+      callback?.(error || null);
+    });
   }
 
   function markNoTranslate(el, lang = '') {
@@ -1986,7 +1992,12 @@
     if (persistTimer) clearTimeout(persistTimer);
     persistTimer = setTimeout(() => {
       const entries = Array.from(translationCache.entries()).slice(-CACHE_LIMIT);
-      chrome.storage.local.set({ [CACHE_KEY]: Object.fromEntries(entries) });
+      chrome.storage.local.set({ [CACHE_KEY]: Object.fromEntries(entries) }, () => {
+        const error = chrome.runtime?.lastError;
+        if (error) {
+          console.warn('[PanSub] failed to save translation cache:', error.message);
+        }
+      });
     }, 1200);
   }
 
