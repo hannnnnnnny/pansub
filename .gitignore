@@ -1,6 +1,7 @@
 dist/
 tmp/
 node_modules/
+.playwright-cli/
 *.zip
 .env
 .DS_Store

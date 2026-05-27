@@ -1,0 +1,15 @@
+{
+  "name": "pansub",
+  "version": "1.1.13",
+  "private": true,
+  "description": "Chrome extension for real-time Panopto subtitle translation.",
+  "type": "commonjs",
+  "scripts": {
+    "check": "node --check content.js && node --check options.js && node --check popup.js && node --check background.js",
+    "test:smoke": "node tests/extension-smoke.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  },
+  "license": "MIT"
+}
