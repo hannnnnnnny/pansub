@@ -33,14 +33,11 @@
     }
 
     .mark {
-      display: grid;
+      display: block;
       width: 36px;
       height: 36px;
-      place-items: center;
       border-radius: 8px;
-      background: var(--accent);
-      color: #08111f;
-      font-weight: 900;
+      box-shadow: 0 7px 16px rgba(0,0,0,.26);
     }
 
     h1 {
@@ -99,11 +96,22 @@
     button:hover {
       border-color: var(--accent);
     }
+
+    button:focus-visible,
+    select:focus-visible,
+    input:focus-visible {
+      outline: 3px solid rgba(110, 168, 255, .42);
+      outline-offset: 2px;
+    }
+
+    input[type="checkbox"] {
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
   <header>
-    <div class="mark">P</div>
+    <img class="mark" src="assets/icon48.png" alt="">
     <div>
       <h1>PanSub</h1>
       <p class="status" id="status" data-i18n="statusReady">Canvas / Panopto subtitles</p>
@@ -111,7 +119,7 @@
   </header>
 
   <div class="row">
-    <span class="label" data-i18n="showSubtitles">Show subtitles</span>
+    <label for="enabled" data-i18n="showSubtitles">Show subtitles</label>
     <input type="checkbox" id="enabled">
   </div>
 
@@ -145,6 +153,7 @@
 
   <button id="openOptions" type="button" data-i18n="openSettings">Open settings</button>
 
+  <script src="settings.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

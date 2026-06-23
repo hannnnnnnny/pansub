@@ -2,6 +2,7 @@ dist/
 tmp/
 node_modules/
 .playwright-cli/
+output/
 *.zip
 .env
 .DS_Store

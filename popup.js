@@ -1,44 +1,11 @@
 const SETTINGS_KEY = 'pansubSettings';
-const DEFAULT_INTERFACE_LANGUAGE = navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
-
-const DEFAULT_SETTINGS = {
-  enabled: true,
-  interfaceLanguage: DEFAULT_INTERFACE_LANGUAGE,
-  targetLanguage: 'zh-CN',
-  displayMode: 'bilingual',
-  subtitlePosition: 'auto',
-  fontSize: 24,
-  originalFontSize: 15,
-  maxWidth: 80,
-  backgroundOpacity: 76,
-  overlayTheme: 'classic',
-  overlayFontFamily: 'system',
-  subtitleColor: '#ffffff',
-  originalColor: '#dbeafe',
-  overlayBackgroundColor: '#000000',
-  overlayBorderColor: '#ffffff',
-  overlayLocked: false,
-  overlayManualX: null,
-  overlayManualY: null,
-  hideNativeCaptions: false,
-  glossaryEnabled: true,
-  cacheEnabled: true,
-  debugLogs: false,
-  floatingButtonEnabled: true,
-  floatingButtonSide: 'right',
-  floatingButtonOpacity: 78,
-  floatingButtonHoverOnly: false,
-  floatingButtonX: null,
-  floatingButtonY: null,
-  floatingButtonSmall: false,
-  floatingButtonDisabledHosts: []
-};
+const DEFAULT_SETTINGS = globalThis.PANSUB_DEFAULT_SETTINGS;
 
 const I18N = {
   en: {
     documentTitle: 'PanSub',
     statusReady: 'Canvas / Panopto subtitles',
-    statusRunning: 'Running on Panopto pages',
+    statusRunning: 'PanSub is enabled',
     statusDisabled: 'Disabled',
     showSubtitles: 'Show subtitles',
     interfaceLanguage: 'Interface',
@@ -59,7 +26,7 @@ const I18N = {
   'zh-CN': {
     documentTitle: 'PanSub',
     statusReady: 'Canvas / Panopto 字幕',
-    statusRunning: '已在 Panopto 页面启用',
+    statusRunning: 'PanSub 已启用',
     statusDisabled: '已关闭',
     showSubtitles: '显示字幕',
     interfaceLanguage: '界面',

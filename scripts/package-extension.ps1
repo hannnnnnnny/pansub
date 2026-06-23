@@ -10,6 +10,7 @@ $ZipPath = Join-Path $Dist "pansub-$Version.zip"
 
 $RequiredFiles = @(
   'manifest.json',
+  'settings.js',
   'background.js',
   'content.js',
   'glossary.js',

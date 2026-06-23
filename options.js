@@ -1,39 +1,6 @@
 const SETTINGS_KEY = 'pansubSettings';
 const CACHE_KEY = 'pansubCache';
-const DEFAULT_INTERFACE_LANGUAGE = navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en';
-
-const DEFAULT_SETTINGS = {
-  enabled: true,
-  interfaceLanguage: DEFAULT_INTERFACE_LANGUAGE,
-  targetLanguage: 'zh-CN',
-  displayMode: 'bilingual',
-  subtitlePosition: 'auto',
-  fontSize: 24,
-  originalFontSize: 15,
-  maxWidth: 80,
-  backgroundOpacity: 76,
-  overlayTheme: 'classic',
-  overlayFontFamily: 'system',
-  subtitleColor: '#ffffff',
-  originalColor: '#dbeafe',
-  overlayBackgroundColor: '#000000',
-  overlayBorderColor: '#ffffff',
-  overlayLocked: false,
-  overlayManualX: null,
-  overlayManualY: null,
-  hideNativeCaptions: false,
-  glossaryEnabled: true,
-  cacheEnabled: true,
-  debugLogs: false,
-  floatingButtonEnabled: true,
-  floatingButtonSide: 'right',
-  floatingButtonOpacity: 78,
-  floatingButtonHoverOnly: false,
-  floatingButtonX: null,
-  floatingButtonY: null,
-  floatingButtonSmall: false,
-  floatingButtonDisabledHosts: []
-};
+const DEFAULT_SETTINGS = globalThis.PANSUB_DEFAULT_SETTINGS;
 
 const THEME_COLOR_DEFAULTS = {
   classic: {
@@ -81,6 +48,7 @@ const I18N = {
     eyebrow: 'Settings',
     pageTitle: 'Lecture subtitle controls',
     reset: 'Reset',
+    resetConfirm: 'Reset all PanSub settings to their defaults?',
     generalTitle: 'General',
     generalDescription: 'Choose when PanSub appears on Panopto recordings.',
     interfaceLanguage: 'Interface language',
@@ -161,7 +129,8 @@ const I18N = {
     consoleDiagnostics: 'Console diagnostics',
     consoleDiagnosticsHelp: 'Print matched caption nodes and subtitle updates.',
     debugNote: 'Open DevTools on the Panopto page and look for <code>[PanSub]</code> messages.',
-    saved: 'Saved'
+    saved: 'Saved',
+    saveFailed: 'Could not save. Please try again.'
   },
   'zh-CN': {
     documentTitle: 'PanSub 设置',
@@ -175,6 +144,7 @@ const I18N = {
     eyebrow: '设置',
     pageTitle: '课程字幕控制',
     reset: '重置',
+    resetConfirm: '确定要把所有 PanSub 设置恢复为默认值吗？',
     generalTitle: '常规',
     generalDescription: '选择 PanSub 何时显示在 Panopto 录像页面上。',
     interfaceLanguage: '界面语言',
@@ -255,7 +225,8 @@ const I18N = {
     consoleDiagnostics: '控制台诊断',
     consoleDiagnosticsHelp: '输出命中的字幕节点和字幕更新日志。',
     debugNote: '打开 Panopto 页面上的 DevTools Console，查看 <code>[PanSub]</code> 日志。',
-    saved: '已保存'
+    saved: '已保存',
+    saveFailed: '保存失败，请重试。'
   }
 };
 
@@ -297,6 +268,7 @@ const outputs = {
 
 let settings = { ...DEFAULT_SETTINGS };
 let saveTimer = null;
+let toastTimer = null;
 const toast = document.getElementById('saved');
 const disabledHostsInput = document.getElementById('floatingButtonDisabledHosts');
 
@@ -309,6 +281,7 @@ function saveToStorage(payload, callback = showSaved) {
     const message = storageErrorMessage();
     if (message) {
       console.warn('[PanSub] settings save failed:', message);
+      showToast('saveFailed', true);
       return;
     }
     callback?.();
@@ -320,6 +293,7 @@ function removeFromStorage(key, callback = showSaved) {
     const message = storageErrorMessage();
     if (message) {
       console.warn('[PanSub] storage remove failed:', message);
+      showToast('saveFailed', true);
       return;
     }
     callback?.();
@@ -443,9 +417,16 @@ function scheduleSave() {
   }, 150);
 }
 
-function showSaved() {
+function showToast(key, isError = false) {
+  if (toastTimer) clearTimeout(toastTimer);
+  toast.textContent = text(key);
+  toast.dataset.variant = isError ? 'error' : 'success';
   toast.classList.add('show');
-  setTimeout(() => toast.classList.remove('show'), 900);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), isError ? 2400 : 1200);
+}
+
+function showSaved() {
+  showToast('saved');
 }
 
 chrome.storage.local.get([SETTINGS_KEY, 'pansubEnabled'], (result) => {
@@ -462,6 +443,7 @@ for (const control of Object.values(controls)) {
 if (disabledHostsInput) disabledHostsInput.addEventListener('input', scheduleSave);
 
 document.getElementById('reset').addEventListener('click', () => {
+  if (!window.confirm(text('resetConfirm'))) return;
   const interfaceLanguage = settings.interfaceLanguage;
   settings = { ...DEFAULT_SETTINGS, interfaceLanguage };
   render();

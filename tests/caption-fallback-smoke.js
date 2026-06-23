@@ -103,6 +103,7 @@ async function main() {
     </html>`);
 
   await installChromeMock(page);
+  await page.addScriptTag({ path: path.join(root, 'settings.js') });
   await page.addScriptTag({ path: path.join(root, 'glossary.js') });
   await page.addScriptTag({ path: path.join(root, 'content.js') });
   await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('回退字幕识别成功'));

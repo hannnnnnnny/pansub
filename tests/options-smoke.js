@@ -101,6 +101,8 @@ async function main() {
   await page.goto(pathToFileURL(path.join(root, 'options.html')).toString());
   await page.waitForSelector('#interfaceLanguage');
   assert.strictEqual(await page.title(), 'PanSub Settings');
+  const desktopRailPosition = await page.locator('.rail').evaluate((el) => getComputedStyle(el).position);
+  assert.strictEqual(desktopRailPosition, 'sticky');
 
   await page.selectOption('#interfaceLanguage', 'zh-CN');
   await page.waitForFunction(() => document.title === 'PanSub 设置');
@@ -122,11 +124,28 @@ async function main() {
   await page.click('#clearTranslationCache');
   await page.waitForFunction(() => !('pansubCache' in window.__pansubStore));
 
+  await page.selectOption('#displayMode', 'original');
+  await page.waitForFunction(() => window.__pansubStore.pansubSettings.displayMode === 'original');
+  page.once('dialog', (dialog) => dialog.dismiss());
+  await page.click('#reset');
+  const settingsAfterCancelledReset = await page.evaluate(() => window.__pansubStore.pansubSettings);
+  assert.strictEqual(settingsAfterCancelledReset.displayMode, 'original', 'cancelled reset should preserve settings');
+
+  page.once('dialog', (dialog) => dialog.accept());
   await page.click('#reset');
   await page.waitForFunction(() => window.__pansubStore.pansubSettings.interfaceLanguage === 'zh-CN');
   const resetSettings = await page.evaluate(() => window.__pansubStore.pansubSettings);
   assert.strictEqual(resetSettings.enabled, true);
   assert.strictEqual(resetSettings.displayMode, 'bilingual');
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  const mobileLayout = await page.evaluate(() => ({
+    pageWidth: document.documentElement.scrollWidth,
+    viewportWidth: window.innerWidth,
+    railHeight: Math.round(document.querySelector('.rail').getBoundingClientRect().height)
+  }));
+  assert(mobileLayout.pageWidth <= mobileLayout.viewportWidth, 'mobile settings page should not overflow horizontally');
+  assert(mobileLayout.railHeight < 180, 'mobile settings header should stay compact');
 
   await browser.close();
   console.log('PanSub options smoke test passed');

@@ -25,39 +25,7 @@
   const FLOATING_SMALL_SIZE = 34;
   const FLOATING_MARGIN = 8;
   const GLOSSARY = window.PANSUB_GLOSSARY || { version: 'none', terms: [] };
-
-  const DEFAULT_SETTINGS = {
-    enabled: true,
-    interfaceLanguage: navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en',
-    targetLanguage: 'zh-CN',
-    displayMode: 'bilingual',
-    subtitlePosition: 'auto',
-    fontSize: 24,
-    originalFontSize: 15,
-    maxWidth: 80,
-    backgroundOpacity: 76,
-    overlayTheme: 'classic',
-    overlayFontFamily: 'system',
-    subtitleColor: '#ffffff',
-    originalColor: '#dbeafe',
-    overlayBackgroundColor: '#000000',
-    overlayBorderColor: '#ffffff',
-    overlayLocked: false,
-    overlayManualX: null,
-    overlayManualY: null,
-    hideNativeCaptions: false,
-    glossaryEnabled: true,
-    cacheEnabled: true,
-    debugLogs: false,
-    floatingButtonEnabled: true,
-    floatingButtonSide: 'right',
-    floatingButtonOpacity: 78,
-    floatingButtonHoverOnly: false,
-    floatingButtonX: null,
-    floatingButtonY: null,
-    floatingButtonSmall: false,
-    floatingButtonDisabledHosts: []
-  };
+  const DEFAULT_SETTINGS = window.PANSUB_DEFAULT_SETTINGS;
 
   const translationCache = new Map();
   let settings = { ...DEFAULT_SETTINGS };
@@ -67,6 +35,7 @@
   let debounceTimer = null;
   let persistTimer = null;
   let translateSeq = 0;
+  let activeTranslationController = null;
   let lastTranslateAt = 0;
   let translateBackoffUntil = 0;
   let overlayEl = null;
@@ -83,7 +52,8 @@
   let nativeCaptionEl = null;
   let captionPollStarted = false;
   let lastStablePlayerRect = null;
-  const observedCaptionEls = new WeakSet();
+  let captionObserver = null;
+  let observedCaptionEl = null;
 
   function debug(...args) {
     if (settings.debugLogs) console.log(...args);
@@ -136,14 +106,41 @@
     return /[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(text);
   }
 
+  function hasHan(text) {
+    return /[\u3400-\u9fff]/.test(text);
+  }
+
+  function hasKana(text) {
+    return /[\u3040-\u30ff]/.test(text);
+  }
+
+  function hasHangul(text) {
+    return /[\uac00-\ud7af]/.test(text);
+  }
+
   function latinRatio(text) {
     const letters = text.match(/[A-Za-z]/g)?.length || 0;
     const visible = text.replace(/\s/g, '').length || 1;
     return letters / visible;
   }
 
-  function sourceLooksTranslated(text) {
-    return hasCjk(text) && latinRatio(text) < 0.25;
+  function detectedTextLanguage(text) {
+    if (hasHangul(text)) return 'ko';
+    if (hasKana(text)) return 'ja';
+    if (hasHan(text) && latinRatio(text) < 0.4) return 'zh-CN';
+    if (latinRatio(text) > 0.5) return 'en';
+    return '';
+  }
+
+  function sourceAlreadyMatchesTarget(text) {
+    if (!text) return false;
+    if (settings.targetLanguage === 'ko') return hasHangul(text);
+    if (settings.targetLanguage === 'ja') return hasKana(text);
+    if (settings.targetLanguage.startsWith('zh')) {
+      return hasHan(text) && !hasKana(text) && !hasHangul(text) && latinRatio(text) < 0.25;
+    }
+    if (settings.targetLanguage === 'en') return latinRatio(text) > 0.55 && !hasCjk(text);
+    return false;
   }
 
   function currentHost() {
@@ -447,8 +444,8 @@
     floatingEl.type = 'button';
     floatingEl.textContent = 'P';
     markNoTranslate(floatingEl);
-    floatingEl.title = 'PanSub quick controls';
-    floatingEl.setAttribute('aria-label', 'PanSub quick controls');
+    floatingEl.title = quickCopy('quickControls');
+    floatingEl.setAttribute('aria-label', floatingEl.title);
     floatingEl.setAttribute('aria-expanded', 'false');
     floatingEl.addEventListener('click', (event) => {
       event.preventDefault();
@@ -495,6 +492,7 @@
   const QUICK_COPY = {
     en: {
       title: 'PanSub',
+      quickControls: 'PanSub quick controls',
       enabled: 'Enabled',
       disabled: 'Disabled',
       showSubtitles: 'Show subtitles',
@@ -523,6 +521,7 @@
     },
     'zh-CN': {
       title: 'PanSub',
+      quickControls: 'PanSub 快捷控制',
       enabled: '已启用',
       disabled: '已关闭',
       showSubtitles: '显示字幕',
@@ -775,7 +774,9 @@
 
     floatingPanelEl = document.createElement('section');
     floatingPanelEl.id = FLOATING_PANEL_ID;
-    floatingPanelEl.setAttribute('aria-label', 'PanSub quick controls');
+    floatingPanelEl.setAttribute('role', 'dialog');
+    floatingPanelEl.setAttribute('aria-modal', 'false');
+    floatingPanelEl.setAttribute('aria-label', quickCopy('quickControls'));
     markNoTranslate(floatingPanelEl);
 
     const header = document.createElement('div');
@@ -870,7 +871,9 @@
 
     floatingSettingsEl = document.createElement('section');
     floatingSettingsEl.id = FLOATING_SETTINGS_ID;
-    floatingSettingsEl.setAttribute('aria-label', 'PanSub floating ball settings');
+    floatingSettingsEl.setAttribute('role', 'dialog');
+    floatingSettingsEl.setAttribute('aria-modal', 'false');
+    floatingSettingsEl.setAttribute('aria-label', quickCopy('floatingSettingsTitle'));
     markNoTranslate(floatingSettingsEl);
 
     const header = document.createElement('div');
@@ -880,12 +883,12 @@
     const close = document.createElement('button');
     close.type = 'button';
     close.dataset.pansubFloatAction = 'close';
-    close.setAttribute('aria-label', 'Close');
+    close.setAttribute('aria-label', quickCopy('close'));
     close.textContent = '×';
     close.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      closeFloatingSettings();
+      closeFloatingSettings(true);
     });
     header.append(title, close);
 
@@ -955,11 +958,15 @@
     floatingSettingsOpen = true;
     applyFloatingSettingsStyle();
     updateFloatingSettingsPanel();
+    window.setTimeout(() => {
+      floatingSettingsEl?.querySelector('[data-pansub-float-control="floatingButtonSmall"]')?.focus();
+    }, 0);
   }
 
-  function closeFloatingSettings() {
+  function closeFloatingSettings(restoreFocus = false) {
     floatingSettingsOpen = false;
     applyFloatingSettingsStyle();
+    if (restoreFocus) floatingEl?.focus();
   }
 
   function runFloatingCommand(action) {
@@ -1112,7 +1119,7 @@
 
     document.addEventListener('click', (event) => {
       if (floatingSettingsOpen && !floatingSettingsEl?.contains(event.target) && !floatingEl?.contains(event.target)) {
-        closeFloatingSettings();
+        closeFloatingSettings(false);
       }
       if (!floatingPanelOpen) return;
       if (floatingEl?.contains(event.target) || floatingPanelEl?.contains(event.target)) return;
@@ -1121,28 +1128,35 @@
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
-        toggleFloatingPanel(false);
-        closeFloatingSettings();
+        toggleFloatingPanel(false, true);
+        closeFloatingSettings(true);
       }
     });
   }
 
-  function toggleFloatingPanel(nextOpen) {
+  function toggleFloatingPanel(nextOpen, restoreFocus = false) {
     createFloatingPanel();
     floatingPanelOpen = typeof nextOpen === 'boolean' ? nextOpen : !floatingPanelOpen;
-    if (floatingPanelOpen) closeFloatingSettings();
+    if (floatingPanelOpen) closeFloatingSettings(false);
     if (floatingEl) {
       floatingEl.setAttribute('aria-expanded', String(floatingPanelOpen));
     }
     applyFloatingPanelStyle();
     updateFloatingPanel();
+    if (floatingPanelOpen) {
+      window.setTimeout(() => {
+        floatingPanelEl?.querySelector('[data-pansub-control="enabled"]')?.focus();
+      }, 0);
+    } else if (restoreFocus) {
+      floatingEl?.focus();
+    }
   }
 
   function applyVisibility() {
     if (!overlayEl) return;
     const hasVisibleSubtitle = settings.displayMode !== 'translation'
       || Boolean(lastTranslatedText)
-      || sourceLooksTranslated(lastOriginalText);
+      || sourceAlreadyMatchesTarget(lastOriginalText);
     overlayEl.style.display = settings.enabled && hasVisibleSubtitle ? 'block' : 'none';
   }
 
@@ -1466,6 +1480,11 @@
     if (targetLanguage) targetLanguage.value = settings.targetLanguage;
     if (settingsButton) settingsButton.textContent = quickCopy('settings');
     if (floatingSettingsButton) floatingSettingsButton.textContent = quickCopy('floatingSettings');
+    if (floatingEl) {
+      floatingEl.title = quickCopy('quickControls');
+      floatingEl.setAttribute('aria-label', floatingEl.title);
+    }
+    floatingPanelEl.setAttribute('aria-label', quickCopy('quickControls'));
 
     floatingPanelEl.querySelectorAll('[data-pansub-label]').forEach((el) => {
       el.textContent = quickCopy(el.dataset.pansubLabel);
@@ -1477,6 +1496,8 @@
 
     const small = floatingSettingsEl.querySelector('[data-pansub-float-control="floatingButtonSmall"]');
     if (small) small.checked = Boolean(settings.floatingButtonSmall);
+    floatingSettingsEl.setAttribute('aria-label', quickCopy('floatingSettingsTitle'));
+    floatingSettingsEl.querySelector('[data-pansub-float-action="close"]')?.setAttribute('aria-label', quickCopy('close'));
 
     floatingSettingsEl.querySelectorAll('[data-pansub-label]').forEach((el) => {
       el.textContent = quickCopy(el.dataset.pansubLabel);
@@ -1790,7 +1811,7 @@
   function updateOverlay(originalText, translatedText) {
     if (!overlayEl) createOverlay();
     markTreeNoTranslate(overlayEl);
-    const originalLang = sourceLooksTranslated(originalText) ? settings.targetLanguage : 'en';
+    const originalLang = detectedTextLanguage(originalText) || 'en';
     document.getElementById(ORIGINAL_ID)?.setAttribute('lang', originalLang);
     document.getElementById(TRANSLATED_ID)?.setAttribute('lang', settings.targetLanguage);
     lastOriginalText = originalText;
@@ -1915,43 +1936,72 @@
     return restored;
   }
 
-  function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  function abortException() {
+    return new DOMException('Translation cancelled', 'AbortError');
   }
 
-  async function waitForTranslateSlot() {
+  function cancelActiveTranslation() {
+    activeTranslationController?.abort();
+    activeTranslationController = null;
+  }
+
+  function sleep(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(abortException());
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(abortException());
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  async function waitForTranslateSlot(signal) {
     const now = Date.now();
     const throttleWait = Math.max(0, TRANSLATE_MIN_INTERVAL_MS - (now - lastTranslateAt));
     const backoffWait = Math.max(0, translateBackoffUntil - now);
     const wait = Math.max(throttleWait, backoffWait);
     if (wait > 0) {
-      await sleep(wait);
+      await sleep(wait, signal);
     }
+    if (signal?.aborted) throw abortException();
     lastTranslateAt = Date.now();
   }
 
   function translationParams(text) {
     return new URLSearchParams({
       client: 'gtx',
-      sl: 'en',
+      sl: 'auto',
       tl: settings.targetLanguage,
       dt: 't',
       q: text
     });
   }
 
-  async function fetchTranslationData(text) {
-    await waitForTranslateSlot();
+  async function fetchTranslationData(text, signal) {
+    await waitForTranslateSlot(signal);
     const params = translationParams(text);
     const baseUrl = 'https://translate.googleapis.com/translate_a/single';
     const usePost = text.length > POST_TEXT_LENGTH;
-    return fetch(usePost ? baseUrl : `${baseUrl}?${params.toString()}`, usePost ? {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-      },
-      body: params.toString()
-    } : undefined);
+    const requestOptions = { signal };
+    if (usePost) {
+      Object.assign(requestOptions, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+        body: params.toString()
+      });
+    }
+    return fetch(usePost ? baseUrl : `${baseUrl}?${params.toString()}`, requestOptions);
   }
 
   function flattenTranslation(data) {
@@ -2001,9 +2051,9 @@
     }, 1200);
   }
 
-  async function translate(text) {
+  async function translate(text, signal) {
     if (!settings.cacheEnabled) {
-      return requestTranslation(text);
+      return requestTranslation(text, signal);
     }
 
     const key = cacheKey(text);
@@ -2011,7 +2061,7 @@
       return translationCache.get(key);
     }
 
-    const translated = await requestTranslation(text);
+    const translated = await requestTranslation(text, signal);
     if (translated) {
       translationCache.set(key, translated);
       pruneTranslationCache();
@@ -2021,24 +2071,34 @@
   }
 
   async function refreshCurrentTranslation() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    cancelActiveTranslation();
     const text = lastOriginalText;
-    if (!text || sourceLooksTranslated(text) || settings.displayMode === 'original') return;
+    if (!text || sourceAlreadyMatchesTarget(text) || settings.displayMode === 'original') return;
 
     const currentSeq = ++translateSeq;
+    const controller = new AbortController();
+    activeTranslationController = controller;
     updateOverlay(text, '');
-    const translated = await translate(text);
-    if (translated && currentSeq === translateSeq && text === lastOriginalText) {
-      updateOverlay(text, translated);
+    try {
+      const translated = await translate(text, controller.signal);
+      if (translated && currentSeq === translateSeq && text === lastOriginalText) {
+        updateOverlay(text, translated);
+      }
+    } finally {
+      if (activeTranslationController === controller) {
+        activeTranslationController = null;
+      }
     }
   }
 
-  async function requestTranslation(text) {
+  async function requestTranslation(text, signal) {
     const prepared = protectGlossaryTerms(text);
     for (let attempt = 0; attempt <= TRANSLATE_RETRY_DELAYS.length; attempt += 1) {
       try {
-        const resp = await fetchTranslationData(prepared.text);
+        const resp = await fetchTranslationData(prepared.text, signal);
         if (!resp.ok) {
-          console.warn(`[PanSub] translation API returned ${resp.status}`);
+          debug(`[PanSub] translation API returned ${resp.status}`);
           if (resp.status < 500 && resp.status !== 429) {
             return '';
           }
@@ -2048,16 +2108,22 @@
           if (translated) {
             return translated;
           }
-          console.warn('[PanSub] empty translation result:', data);
+          debug('[PanSub] empty translation result:', data);
         }
       } catch (err) {
-        console.error('[PanSub] translation failed:', err);
+        if (err?.name === 'AbortError') return '';
+        debug('[PanSub] translation failed:', err);
       }
 
       const delay = TRANSLATE_RETRY_DELAYS[attempt];
       if (!delay) break;
       translateBackoffUntil = Date.now() + delay;
-      await sleep(delay);
+      try {
+        await sleep(delay, signal);
+      } catch (err) {
+        if (err?.name === 'AbortError') return '';
+        throw err;
+      }
     }
     return '';
   }
@@ -2088,6 +2154,7 @@
 
     if (!settings.enabled) {
       if (debounceTimer) clearTimeout(debounceTimer);
+      cancelActiveTranslation();
       translateSeq += 1;
       lastText = '';
       lastTranslatedText = '';
@@ -2098,11 +2165,13 @@
     const text = caption.el.textContent.trim();
     if (!text || text === lastText) return;
     lastText = text;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    cancelActiveTranslation();
     const currentSeq = ++translateSeq;
     debug(`[PanSub] New caption(${caption.mode}): ${text}`);
 
-    if (sourceLooksTranslated(text)) {
-      debug('[PanSub] caption appears page-translated; skipping machine translation:', text);
+    if (sourceAlreadyMatchesTarget(text)) {
+      debug('[PanSub] caption already matches target language; skipping machine translation:', text);
       updateOverlay('', text);
       return;
     }
@@ -2111,27 +2180,35 @@
 
     if (settings.displayMode === 'original') return;
 
-    if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
-      const translated = await translate(text);
-      if (translated && currentSeq === translateSeq && text === lastText) {
-        updateOverlay(text, translated);
-      } else if (translated) {
-        debug('[PanSub] stale translation ignored:', text);
+      const controller = new AbortController();
+      activeTranslationController = controller;
+      try {
+        const translated = await translate(text, controller.signal);
+        if (translated && currentSeq === translateSeq && text === lastText) {
+          updateOverlay(text, translated);
+        } else if (translated) {
+          debug('[PanSub] stale translation ignored:', text);
+        }
+      } finally {
+        if (activeTranslationController === controller) {
+          activeTranslationController = null;
+        }
       }
     }, DEBOUNCE_MS);
   }
 
   function attachObserver(target) {
-    if (observedCaptionEls.has(target)) return;
-    observedCaptionEls.add(target);
+    if (observedCaptionEl === target) return;
+    captionObserver?.disconnect();
+    observedCaptionEl = target;
     protectCaptionElement(target);
 
-    const observer = new MutationObserver(() => {
+    captionObserver = new MutationObserver(() => {
       protectCaptionElement(target);
       handleCaptionChange();
     });
-    observer.observe(target, {
+    captionObserver.observe(target, {
       childList: true,
       subtree: true,
       characterData: true
@@ -2179,6 +2256,11 @@
       const shouldRetranslate = previousSettings.targetLanguage !== settings.targetLanguage
         || previousSettings.glossaryEnabled !== settings.glossaryEnabled
         || previousSettings.displayMode !== settings.displayMode;
+      if (!settings.enabled) {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        cancelActiveTranslation();
+        translateSeq += 1;
+      }
       if (shouldRetranslate) {
         lastTranslatedText = '';
       }

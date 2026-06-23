@@ -62,6 +62,18 @@ PanSub 是一个 Chrome 扩展，用来在 Canvas / Panopto 课程录像里实�
 
 ## 更新日志
 
+### 1.1.15
+
+- 新字幕出现、目标语言变化或插件关闭时，会真正取消旧翻译请求，减少无效网络流量。
+- 字幕节点被 Panopto 重建时会断开旧 Observer，避免长时间播放时积累监听器。
+- 翻译源语言改为自动检测，修复非英文原字幕无法正确翻译到英语、日语或韩语的问题。
+- 设置页侧栏保持可见，移动端头部更紧凑，并增加清晰的键盘焦点样式。
+- 全局重置新增确认步骤；保存失败会显示可见错误反馈。
+- popup 和悬浮控制面板补齐准确状态文案、中文无障碍标签、dialog 语义和焦点管理。
+- options 与 popup 统一使用正式 PanSub 图标。
+- 默认设置集中到共享脚本，降低 popup、设置页和内容脚本之间的配置漂移风险。
+- Panopto 页面权限收紧为 HTTPS 子域名，并新增 popup 自动化测试。
+
 ### 1.1.14
 
 - 修复关闭 PanSub 后仍继续发送翻译请求的问题。
@@ -135,8 +147,7 @@ PanSub 是一个 Chrome 扩展，用来在 Canvas / Panopto 课程录像里实�
 
 ```json
 [
-  "*://*.panopto.com/*",
-  "*://*.au.panopto.com/*"
+  "https://*.panopto.com/*"
 ]
 ```
 
@@ -161,6 +172,7 @@ pansub/
 |-- background.js
 |-- content.js
 |-- glossary.js
+|-- settings.js
 |-- manifest.json
 |-- options.html
 |-- options.css
@@ -238,6 +250,18 @@ Click the PanSub icon and make sure **Show subtitles** is enabled. The default b
 
 ## Changelog
 
+### 1.1.15
+
+- Superseded translation requests are now aborted when captions, language settings, or enabled state change.
+- Old caption observers are disconnected when Panopto rebuilds the native caption node.
+- Source language now uses automatic detection, fixing non-English captions translated to English, Japanese, or Korean.
+- Settings navigation stays visible, the mobile header is more compact, and keyboard focus states are clearer.
+- Reset now requires confirmation, while storage failures produce visible feedback.
+- Popup and floating controls now have accurate status copy, localized accessible labels, dialog semantics, and focus management.
+- Options and popup now use the official PanSub icon.
+- Default settings are centralized in one shared script to prevent configuration drift.
+- Panopto access is restricted to HTTPS subdomains, with new popup regression coverage.
+
 ### 1.1.14
 
 - Fixed disabled PanSub still sending translation requests.
@@ -311,8 +335,7 @@ Note: after editing the code, reload the extension in `chrome://extensions`, the
 
 ```json
 [
-  "*://*.panopto.com/*",
-  "*://*.au.panopto.com/*"
+  "https://*.panopto.com/*"
 ]
 ```
 
@@ -337,6 +360,7 @@ pansub/
 |-- background.js
 |-- content.js
 |-- glossary.js
+|-- settings.js
 |-- manifest.json
 |-- options.html
 |-- options.css
