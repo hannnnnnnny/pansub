@@ -109,6 +109,16 @@ async function main() {
   const pageHeading = await page.locator('h2').textContent();
   assert.strictEqual(pageHeading, '课程字幕控制');
 
+  await page.keyboard.press('Control+K');
+  await page.waitForSelector('#commandPalette:not([hidden])');
+  assert.strictEqual(await page.locator('#commandSearch').getAttribute('placeholder'), '搜索设置...');
+  await page.fill('#commandSearch', '字幕');
+  const subtitleCommand = page.locator('[data-command-target="subtitles"]');
+  assert.strictEqual(await subtitleCommand.isVisible(), true, 'settings search should find subtitle controls');
+  assert.strictEqual(await page.locator('[data-command-target="debug"]').isVisible(), false, 'settings search should filter unrelated controls');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.querySelector('#commandPalette')?.hidden === true);
+
   await page.fill('#floatingButtonDisabledHosts', 'auckland.au.panopto.com\nexample.panopto.com');
   await page.dispatchEvent('#floatingButtonDisabledHosts', 'input');
   await page.waitForFunction(() => window.__pansubStore.pansubSettings.floatingButtonDisabledHosts.length === 2);
@@ -126,6 +136,7 @@ async function main() {
 
   await page.selectOption('#displayMode', 'original');
   await page.waitForFunction(() => window.__pansubStore.pansubSettings.displayMode === 'original');
+  assert.strictEqual(await page.locator('#previewTranslation').isHidden(), true, 'live preview should reflect original-only mode');
   page.once('dialog', (dialog) => dialog.dismiss());
   await page.click('#reset');
   const settingsAfterCancelledReset = await page.evaluate(() => window.__pansubStore.pansubSettings);

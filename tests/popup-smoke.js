@@ -65,6 +65,9 @@ async function main() {
 
   await page.selectOption('#displayMode', 'translation');
   await page.waitForFunction(() => window.__pansubStore.pansubSettings.displayMode === 'translation');
+  await page.selectOption('#targetLanguage', 'ja');
+  await page.waitForFunction(() => window.__pansubStore.pansubSettings.targetLanguage === 'ja');
+  assert.strictEqual(await page.locator('.status-panel').getAttribute('class'), 'status-panel is-off');
   await page.click('#openOptions');
   const optionsOpened = await page.evaluate(() => window.__pansubOptionsOpened);
   assert.strictEqual(optionsOpened, 1);

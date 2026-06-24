@@ -442,7 +442,13 @@
     floatingEl = document.createElement('button');
     floatingEl.id = FLOATING_ID;
     floatingEl.type = 'button';
-    floatingEl.textContent = 'P';
+    const floatingMark = document.createElement('span');
+    floatingMark.dataset.pansubFloatingPart = 'mark';
+    floatingMark.textContent = 'P';
+    const floatingSignal = document.createElement('span');
+    floatingSignal.dataset.pansubFloatingPart = 'signal';
+    floatingSignal.setAttribute('aria-hidden', 'true');
+    floatingEl.append(floatingMark, floatingSignal);
     markNoTranslate(floatingEl);
     floatingEl.title = quickCopy('quickControls');
     floatingEl.setAttribute('aria-label', floatingEl.title);
@@ -557,6 +563,18 @@
 
   function setStyles(el, styles) {
     Object.assign(el.style, styles);
+  }
+
+  function motionTransition(value) {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'none' : value;
+  }
+
+  function animatePanelOpen(panel) {
+    if (!panel?.animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    panel.animate([
+      { opacity: 0, transform: 'translateY(-50%) scale(.94)' },
+      { opacity: 1, transform: 'translateY(-50%) scale(1)' }
+    ], { duration: 190, easing: 'cubic-bezier(.2,.8,.2,1)' });
   }
 
   function normalizeHexColor(value, fallback) {
@@ -956,7 +974,8 @@
   function openFloatingSettings() {
     createFloatingSettingsPanel();
     floatingSettingsOpen = true;
-    applyFloatingSettingsStyle();
+    applyFloatingButtonStyle();
+    animatePanelOpen(floatingSettingsEl);
     updateFloatingSettingsPanel();
     window.setTimeout(() => {
       floatingSettingsEl?.querySelector('[data-pansub-float-control="floatingButtonSmall"]')?.focus();
@@ -965,7 +984,7 @@
 
   function closeFloatingSettings(restoreFocus = false) {
     floatingSettingsOpen = false;
-    applyFloatingSettingsStyle();
+    applyFloatingButtonStyle();
     if (restoreFocus) floatingEl?.focus();
   }
 
@@ -1141,9 +1160,10 @@
     if (floatingEl) {
       floatingEl.setAttribute('aria-expanded', String(floatingPanelOpen));
     }
-    applyFloatingPanelStyle();
+    applyFloatingButtonStyle();
     updateFloatingPanel();
     if (floatingPanelOpen) {
+      animatePanelOpen(floatingPanelEl);
       window.setTimeout(() => {
         floatingPanelEl?.querySelector('[data-pansub-control="enabled"]')?.focus();
       }, 0);
@@ -1174,32 +1194,54 @@
       'bottom: auto',
       `width: ${size}px`,
       `height: ${size}px`,
-      'border: 0',
+      `border: 1px solid ${settings.enabled ? 'rgba(110,231,200,.5)' : 'rgba(203,213,225,.24)'}`,
       'border-radius: 50%',
-      `background: rgba(${settings.enabled ? '47,109,246' : '93,103,118'},${alpha})`,
+      `background: rgba(${settings.enabled ? '10,119,102' : '63,74,72'},${alpha})`,
       'color: #fff',
       `font: 800 ${settings.floatingButtonSmall ? 15 : 18}px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`,
-      'box-shadow: 0 10px 24px rgba(0,0,0,0.26)',
+      floatingPanelOpen || floatingSettingsOpen
+        ? 'box-shadow: 0 0 0 4px rgba(110,231,200,.12), 0 14px 32px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.2)'
+        : 'box-shadow: 0 10px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.18)',
       'z-index: 2147483647',
       floatingDrag ? 'cursor: grabbing' : 'cursor: grab',
       'pointer-events: auto',
       'user-select: none',
       'touch-action: none',
-      'transform: none',
+      floatingPanelOpen || floatingSettingsOpen ? 'transform: scale(1.06)' : 'transform: none',
       settings.floatingButtonHoverOnly ? 'opacity: 0.2' : 'opacity: 1',
-      floatingDrag ? 'transition: none' : 'transition: opacity .16s ease, transform .16s ease, background .16s ease',
+      floatingDrag ? 'transition: none' : `transition: ${motionTransition('opacity .18s ease, transform .2s cubic-bezier(.2,.8,.2,1), background .18s ease, border-color .18s ease, box-shadow .18s ease')}`,
       visible ? 'display: block' : 'display: none'
     ].join(';');
+
+    const mark = floatingEl.querySelector('[data-pansub-floating-part="mark"]');
+    const signal = floatingEl.querySelector('[data-pansub-floating-part="signal"]');
+    if (mark) {
+      mark.style.cssText = 'display:grid;place-items:center;width:100%;height:100%;pointer-events:none;';
+    }
+    if (signal) {
+      signal.style.cssText = [
+        'position:absolute',
+        'right:2px',
+        'top:2px',
+        `width:${settings.floatingButtonSmall ? 6 : 7}px`,
+        `height:${settings.floatingButtonSmall ? 6 : 7}px`,
+        'border:2px solid rgba(8,18,17,.88)',
+        'border-radius:50%',
+        `background:${settings.enabled ? '#6ee7c8' : '#94a3b8'}`,
+        settings.enabled ? 'box-shadow:0 0 0 3px rgba(110,231,200,.1),0 0 10px rgba(110,231,200,.6)' : 'box-shadow:none',
+        'pointer-events:none'
+      ].join(';');
+    }
 
     floatingEl.onmouseenter = () => {
       if (floatingDrag) return;
       floatingEl.style.opacity = '1';
-      floatingEl.style.transform = 'scale(1.04)';
+      floatingEl.style.transform = 'scale(1.08)';
     };
     floatingEl.onmouseleave = () => {
       if (floatingDrag) return;
       floatingEl.style.opacity = settings.floatingButtonHoverOnly ? '0.2' : '1';
-      floatingEl.style.transform = 'none';
+      floatingEl.style.transform = floatingPanelOpen || floatingSettingsOpen ? 'scale(1.06)' : 'none';
     };
 
     if (!visible) floatingPanelOpen = false;
@@ -1211,7 +1253,9 @@
   function applyFloatingPanelStyle() {
     if (!floatingPanelEl) return;
 
-    const display = isFloatingButtonVisible() && floatingPanelOpen ? 'block' : 'none';
+    const buttonVisible = isFloatingButtonVisible();
+    const panelVisible = buttonVisible && floatingPanelOpen;
+    const display = panelVisible ? 'block' : 'none';
     const buttonPosition = floatingPosition();
     const size = floatingButtonSize();
     const panelWidth = Math.min(260, Math.max(140, window.innerWidth - FLOATING_MARGIN * 2));
@@ -1234,15 +1278,19 @@
       bottom: 'auto',
       width: `${panelWidth}px`,
       maxWidth: 'calc(100vw - 16px)',
-      color: '#f8fafc',
-      background: 'rgba(15, 23, 42, 0.96)',
-      border: '1px solid rgba(148, 163, 184, 0.28)',
-      borderRadius: '12px',
-      boxShadow: '0 22px 48px rgba(0,0,0,0.34)',
+      color: '#f2faf7',
+      background: 'rgba(13, 21, 21, 0.97)',
+      border: '1px solid rgba(110, 231, 200, 0.2)',
+      borderRadius: '8px',
+      boxShadow: '0 24px 56px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,.04)',
       padding: '12px',
       zIndex: '2147483647',
-      pointerEvents: 'auto',
-      transform: 'translateY(-50%)',
+      pointerEvents: panelVisible ? 'auto' : 'none',
+      opacity: panelVisible ? '1' : '0',
+      visibility: panelVisible ? 'visible' : 'hidden',
+      transform: panelVisible ? 'translateY(-50%) scale(1)' : 'translateY(-50%) scale(.94)',
+      transformOrigin: opensRight ? 'left center' : 'right center',
+      transition: motionTransition('opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1), visibility .18s ease'),
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
       fontSize: '13px',
       lineHeight: '1.35',
@@ -1265,8 +1313,9 @@
       setStyles(el, {
         borderRadius: '999px',
         padding: '3px 8px',
-        background: settings.enabled ? 'rgba(34,197,94,.16)' : 'rgba(148,163,184,.16)',
-        color: settings.enabled ? '#86efac' : '#cbd5e1',
+        border: `1px solid ${settings.enabled ? 'rgba(110,231,200,.2)' : 'rgba(148,163,184,.16)'}`,
+        background: settings.enabled ? 'rgba(110,231,200,.1)' : 'rgba(148,163,184,.1)',
+        color: settings.enabled ? '#6ee7c8' : '#cbd5e1',
         fontSize: '12px',
         fontWeight: '700'
       });
@@ -1278,7 +1327,7 @@
         justifyContent: 'space-between',
         gap: '12px',
         padding: '9px 0',
-        borderTop: '1px solid rgba(148,163,184,.18)'
+        borderTop: '1px solid rgba(255,255,255,.08)'
       });
     });
     floatingPanelEl.querySelectorAll('[data-pansub-part="stack"]').forEach((el) => {
@@ -1286,7 +1335,7 @@
         display: 'grid',
         gap: '6px',
         padding: '9px 0',
-        borderTop: '1px solid rgba(148,163,184,.18)'
+        borderTop: '1px solid rgba(255,255,255,.08)'
       });
     });
     floatingPanelEl.querySelectorAll('[data-pansub-part="actions"]').forEach((el) => {
@@ -1295,30 +1344,30 @@
         gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
         gap: '8px',
         paddingTop: '10px',
-        borderTop: '1px solid rgba(148,163,184,.18)'
+        borderTop: '1px solid rgba(255,255,255,.08)'
       });
     });
     floatingPanelEl.querySelectorAll('span').forEach((el) => {
       if (el.dataset.pansubText === 'status') return;
-      setStyles(el, { color: '#dbeafe', fontWeight: '700' });
+      setStyles(el, { color: '#d6e6e1', fontWeight: '700' });
     });
     floatingPanelEl.querySelectorAll('input[type="checkbox"]').forEach((el) => {
       setStyles(el, {
         width: '38px',
         height: '22px',
         margin: '0',
-        accentColor: '#3b82f6',
+        accentColor: '#32c9a6',
         cursor: 'pointer'
       });
     });
     floatingPanelEl.querySelectorAll('select').forEach((el) => {
       setStyles(el, {
         width: '100%',
-        border: '1px solid rgba(148,163,184,.28)',
-        borderRadius: '8px',
+        border: '1px solid rgba(255,255,255,.12)',
+        borderRadius: '7px',
         padding: '7px 8px',
         color: '#f8fafc',
-        background: '#111827',
+        background: '#14201e',
         font: '600 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         cursor: 'pointer'
       });
@@ -1327,20 +1376,20 @@
       setStyles(el, {
         width: '100%',
         marginTop: '0',
-        border: '1px solid rgba(96,165,250,.42)',
-        borderRadius: '8px',
+        border: '1px solid rgba(110,231,200,.24)',
+        borderRadius: '7px',
         padding: '9px 10px',
-        color: '#dbeafe',
-        background: 'rgba(37, 99, 235, .2)',
+        color: '#dff8f1',
+        background: 'rgba(110,231,200,.09)',
         font: '800 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         cursor: 'pointer'
       });
     });
     floatingPanelEl.querySelectorAll('[data-pansub-variant="quiet"]').forEach((el) => {
       setStyles(el, {
-        borderColor: 'rgba(148,163,184,.26)',
+        borderColor: 'rgba(255,255,255,.11)',
         color: '#cbd5e1',
-        background: 'rgba(15,23,42,.18)'
+        background: 'rgba(255,255,255,.025)'
       });
     });
   }
@@ -1348,7 +1397,9 @@
   function applyFloatingSettingsStyle() {
     if (!floatingSettingsEl) return;
 
-    const display = isFloatingButtonVisible() && floatingSettingsOpen ? 'block' : 'none';
+    const buttonVisible = isFloatingButtonVisible();
+    const panelVisible = buttonVisible && floatingSettingsOpen;
+    const display = panelVisible ? 'block' : 'none';
     const buttonPosition = floatingPosition();
     const size = floatingButtonSize();
     const panelWidth = Math.min(286, Math.max(180, window.innerWidth - FLOATING_MARGIN * 2));
@@ -1372,13 +1423,17 @@
       maxWidth: 'calc(100vw - 16px)',
       padding: '12px',
       color: '#f8fafc',
-      background: 'linear-gradient(180deg, rgba(8,17,31,.98), rgba(15,23,42,.96))',
-      border: '1px solid rgba(125, 211, 252, .22)',
-      borderRadius: '12px',
-      boxShadow: '0 22px 48px rgba(0,0,0,.38)',
+      background: 'rgba(13,21,21,.98)',
+      border: '1px solid rgba(110,231,200,.2)',
+      borderRadius: '8px',
+      boxShadow: '0 24px 56px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04)',
       zIndex: '2147483647',
-      pointerEvents: 'auto',
-      transform: 'translateY(-50%)',
+      pointerEvents: panelVisible ? 'auto' : 'none',
+      opacity: panelVisible ? '1' : '0',
+      visibility: panelVisible ? 'visible' : 'hidden',
+      transform: panelVisible ? 'translateY(-50%) scale(1)' : 'translateY(-50%) scale(.94)',
+      transformOrigin: opensRight ? 'left center' : 'right center',
+      transition: motionTransition('opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1), visibility .18s ease'),
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
       fontSize: '13px',
       lineHeight: '1.35',
@@ -1588,7 +1643,7 @@
       `color: ${subtitleColor}`,
       'padding: 8px 14px',
       'border-radius: 8px',
-      'z-index: 2147483647',
+      'z-index: 2147483645',
       'pointer-events: auto',
       'text-align: center',
       `font-family: ${overlayFontFamily()}`,

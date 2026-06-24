@@ -15,6 +15,7 @@ $RequiredFiles = @(
   'content.js',
   'glossary.js',
   'popup.html',
+  'popup.css',
   'popup.js',
   'options.html',
   'options.css',

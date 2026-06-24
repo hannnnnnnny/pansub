@@ -7,7 +7,10 @@ const I18N = {
     statusReady: 'Canvas / Panopto subtitles',
     statusRunning: 'PanSub is enabled',
     statusDisabled: 'Disabled',
+    statusDetail: 'Translation layer is ready',
+    statusDetailOff: 'Enable PanSub to resume translation',
     showSubtitles: 'Show subtitles',
+    showSubtitlesHelp: 'Enable the live translation layer',
     interfaceLanguage: 'Interface',
     languageEnglish: 'English',
     languageChinese: 'Chinese',
@@ -21,14 +24,24 @@ const I18N = {
     positionPageBottom: 'Page bottom',
     positionFollowCaptionShort: 'Follow caption',
     positionManual: 'Manual drag',
-    openSettings: 'Open settings'
+    targetLanguage: 'Translate to',
+    targetChineseSimplified: 'Simplified Chinese',
+    targetChineseTraditional: 'Traditional Chinese',
+    targetJapanese: 'Japanese',
+    targetKorean: 'Korean',
+    targetEnglish: 'English',
+    openSettings: 'Open settings',
+    autoSync: 'Changes sync instantly'
   },
   'zh-CN': {
     documentTitle: 'PanSub',
     statusReady: 'Canvas / Panopto 字幕',
     statusRunning: 'PanSub 已启用',
     statusDisabled: '已关闭',
+    statusDetail: '实时翻译字幕层已就绪',
+    statusDetailOff: '开启 PanSub 后恢复翻译',
     showSubtitles: '显示字幕',
+    showSubtitlesHelp: '开启实时翻译字幕层',
     interfaceLanguage: '界面',
     languageEnglish: 'English',
     languageChinese: '中文',
@@ -42,15 +55,25 @@ const I18N = {
     positionPageBottom: '页面底部',
     positionFollowCaptionShort: '跟随字幕',
     positionManual: '手动拖动',
-    openSettings: '打开设置'
+    targetLanguage: '翻译为',
+    targetChineseSimplified: '简体中文',
+    targetChineseTraditional: '繁体中文',
+    targetJapanese: '日语',
+    targetKorean: '韩语',
+    targetEnglish: '英语',
+    openSettings: '打开设置',
+    autoSync: '更改会立即同步'
   }
 };
 
 const enabled = document.getElementById('enabled');
 const interfaceLanguage = document.getElementById('interfaceLanguage');
 const displayMode = document.getElementById('displayMode');
+const targetLanguage = document.getElementById('targetLanguage');
 const subtitlePosition = document.getElementById('subtitlePosition');
 const status = document.getElementById('status');
+const statusDetail = document.getElementById('statusDetail');
+const statusPanel = document.querySelector('.status-panel');
 const openOptions = document.getElementById('openOptions');
 
 let settings = { ...DEFAULT_SETTINGS };
@@ -82,9 +105,13 @@ function render() {
   enabled.checked = settings.enabled;
   interfaceLanguage.value = settings.interfaceLanguage;
   displayMode.value = settings.displayMode;
+  targetLanguage.value = settings.targetLanguage;
   subtitlePosition.value = settings.subtitlePosition;
   applyTranslations();
   status.textContent = settings.enabled ? text('statusRunning') : text('statusDisabled');
+  statusDetail.textContent = settings.enabled ? text('statusDetail') : text('statusDetailOff');
+  statusPanel.classList.toggle('is-off', !settings.enabled);
+  document.body.classList.remove('is-loading');
 }
 
 function save() {
@@ -93,6 +120,7 @@ function save() {
     enabled: enabled.checked,
     interfaceLanguage: interfaceLanguage.value,
     displayMode: displayMode.value,
+    targetLanguage: targetLanguage.value,
     subtitlePosition: subtitlePosition.value
   };
   chrome.storage.local.set({
@@ -119,6 +147,7 @@ chrome.storage.local.get([SETTINGS_KEY, 'pansubEnabled'], (result) => {
 enabled.addEventListener('change', save);
 interfaceLanguage.addEventListener('change', save);
 displayMode.addEventListener('change', save);
+targetLanguage.addEventListener('change', save);
 subtitlePosition.addEventListener('change', save);
 
 openOptions.addEventListener('click', () => {

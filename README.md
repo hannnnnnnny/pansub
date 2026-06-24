@@ -55,12 +55,24 @@ PanSub 是一个 Chrome 扩展，用来在 Canvas / Panopto 课程录像里实�
 | 可调显示效果 | 可调字幕大小、位置、宽度和背景透明度 |
 | 字幕框自定义 | 支持样式预设、字体、颜色、拖动位置和锁定 |
 | 悬浮快捷按钮 | 可拖动、可隐藏、可快速开关字幕 |
+| 设置搜索与实时预览 | `Ctrl/Cmd + K` 快速查找设置，字幕样式会即时预览 |
+| 动态控制界面 | 弹窗、设置页和悬浮面板提供清晰状态反馈与克制动效 |
 | 设置页语言切换 | 设置界面支持中文和英文 |
 | 学术术语优化 | 内置跨学科术语表，覆盖 IT、商科、艺术、科学、法律等方向 |
 | 全屏适配 | 全屏播放时字幕和悬浮按钮会进入播放器内部 |
 | 本地缓存 | 重复字幕会优先使用本地缓存，减少重复翻译请求 |
 
 ## 更新日志
+
+### 1.1.16
+
+- 全面更新 popup、设置页和播放器快捷面板，形成统一的 PanSub “Lecture Signal” 视觉系统。
+- 设置页新增 `Ctrl/Cmd + K` 搜索面板，可直接查找并跳转到字幕、翻译、快捷控制等设置。
+- 新增实时字幕预览，显示模式、目标语言、字体、颜色、字号、宽度、透明度和锁定状态会即时反映。
+- popup 新增目标语言快捷选择、字幕运行状态和更紧凑的两列控制布局。
+- 悬浮球新增启用状态信号、打开反馈和从按钮展开的面板动效。
+- 修复快捷面板与字幕锁按钮处于同一最高层时可能发生的控件重叠。
+- 所有新增动效支持系统“减少动态效果”设置，并补充设置搜索与预览自动化测试。
 
 ### 1.1.15
 
@@ -243,12 +255,24 @@ Click the PanSub icon and make sure **Show subtitles** is enabled. The default b
 | Visual controls | Adjustable subtitle size, position, width, and background opacity |
 | Subtitle box customization | Style presets, fonts, colors, drag positioning, and lock control |
 | Floating quick button | Draggable, compact, hideable, and useful for quick subtitle control |
+| Settings search and live preview | Press `Ctrl/Cmd + K` to find settings and preview subtitle styling instantly |
+| Responsive control surfaces | Popup, settings, and floating panel provide clear state feedback and restrained motion |
 | Interface language switch | Settings page supports English and Chinese |
 | Academic glossary | Built-in terms for IT, business, arts, science, law, and more |
 | Fullscreen support | Subtitles and controls move into the fullscreen Panopto player |
 | Local cache | Repeated captions can reuse local translation cache |
 
 ## Changelog
+
+### 1.1.16
+
+- Redesigned the popup, settings page, and player quick panel around a unified PanSub “Lecture Signal” interface.
+- Added `Ctrl/Cmd + K` settings search with direct navigation to subtitle, translation, quick-control, and debug sections.
+- Added a live subtitle preview for display mode, target language, font, color, size, width, opacity, and lock state.
+- Added target-language switching and clearer runtime status to the popup.
+- Added an enabled signal, open-state feedback, and anchored expansion motion to the floating button.
+- Fixed a stacking conflict that could place the subtitle lock control above the quick panel.
+- New motion respects the system reduced-motion preference, with regression tests for search and preview behavior.
 
 ### 1.1.15
 

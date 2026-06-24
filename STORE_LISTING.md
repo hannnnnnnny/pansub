@@ -57,6 +57,8 @@ Features:
 - Real-time bilingual subtitles for Canvas / Panopto recordings
 - Built-in academic glossary for business, arts, IT, science, law, and more
 - Interface language switch for English or Chinese settings UI
+- Searchable settings command panel and live subtitle style preview
+- Compact popup controls with target-language switching and clear runtime status
 - Display modes: bilingual, translation only, or original only
 - Position modes for on-video captions and docked Panopto captions
 - Adjustable subtitle size, overlay width, and background opacity
@@ -124,7 +126,7 @@ Publish automatically after review: Off for staged review, On if you want immedi
 Extension package:
 
 ```text
-dist/pansub-1.1.15.zip
+dist/pansub-1.1.16.zip
 ```
 
 Icon:
@@ -213,6 +215,8 @@ Features:
 - Real-time bilingual subtitles for Canvas / Panopto recordings
 - Built-in academic glossary for business, arts, IT, science, law, and more
 - Interface language switch for English or Chinese settings UI
+- Searchable settings command panel and live subtitle style preview
+- Compact popup controls with target-language switching and clear runtime status
 - Display modes: bilingual, translation only, or original only
 - Position modes for on-video captions and docked Panopto captions
 - Adjustable subtitle size, overlay width, and background opacity
