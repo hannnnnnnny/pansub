@@ -4,6 +4,10 @@
   globalThis.PANSUB_DEFAULT_SETTINGS = Object.freeze({
     enabled: true,
     interfaceLanguage,
+    subtitleSource: 'auto',
+    audioSourceLanguage: 'en-US',
+    audioDisclosureAccepted: false,
+    audioGoogleFallbackConsent: false,
     targetLanguage: 'zh-CN',
     displayMode: 'bilingual',
     subtitlePosition: 'auto',
