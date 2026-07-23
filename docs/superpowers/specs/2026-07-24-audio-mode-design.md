@@ -47,7 +47,7 @@ The popup and floating control share one state machine:
 1. `native`: translating native captions.
 2. `available`: no captions detected; Audio Mode can be started.
 3. `permission`: waiting for optional capture permission.
-4. `downloading`: downloading and verifying local model assets with progress and cancel controls.
+4. `downloading`: Chrome is preparing or downloading its local English language pack; PanSub shows an indeterminate status and lets the user leave the waiting state.
 5. `warming`: loading the recognizer and translator.
 6. `listening`: capturing tab audio and producing streaming subtitles.
 7. `degraded`: device cannot keep up; recognition interval has been increased.
@@ -81,11 +81,11 @@ An extension-owned offscreen document consumes the `tabCapture` stream. It:
 - reconnects captured audio to an `AudioContext` destination so the lecture remains audible;
 - converts audio to mono 16 kHz PCM;
 - feeds short frames into the local recognizer;
-- owns model loading and recognition worker lifecycle;
+- owns the browser recognizer lifecycle;
 - sends partial and final hypotheses to the background coordinator;
 - closes tracks, workers, buffers, and contexts on stop.
 
-All executable JavaScript, workers, AudioWorklet code, and WebAssembly are packaged with the extension. Manifest V3 remote hosted code is not used.
+All executable JavaScript and AudioWorklet code is packaged with the extension. Manifest V3 remote hosted code is not used.
 
 ### Recognition adapter
 
@@ -101,7 +101,9 @@ stop()
 dispose()
 ```
 
-The primary candidate is Sherpa-ONNX streaming English Zipformer through WebAssembly SIMD. It is selected for low streaming latency and local execution. The adapter boundary allows a later Whisper or alternative model without changing capture, translation, or UI code.
+The primary recognizer is Chrome's on-device Web Speech API, available from Chrome 139. The offscreen runtime passes the live tab-audio `MediaStreamTrack` to `SpeechRecognition.start(audioTrack)`, sets `processLocally = true`, and enables continuous interim results. It checks `SpeechRecognition.available()` and uses `SpeechRecognition.install()` when the English language pack is downloadable. Chrome 150's `quality: 'dictation'` hint is enabled only when feature detection confirms support.
+
+The adapter boundary allows a later Sherpa-ONNX, Whisper, or alternative recognizer without changing capture, translation, or UI code. Audio Mode does not fall back to cloud speech recognition when the local browser recognizer is unavailable.
 
 ### Translation adapter
 
@@ -140,16 +142,14 @@ These are acceptance targets, not claims made to users. A benchmark harness meas
 
 If processing falls behind, Audio Mode increases the frame aggregation interval and reports `degraded` instead of allowing an unbounded queue. Old audio and stale translation work are discarded rather than replayed late.
 
-## Model Distribution
+## Language Pack Distribution
 
-- Executable runtime assets are bundled inside the extension package.
-- Model weights and token data are downloaded on first use from a fixed versioned URL because they are data, not executable extension code.
-- Downloaded assets are checksum-verified and stored in browser-managed local cache storage.
-- The model version, expected size, source, license, and checksum are pinned in extension code.
-- Model download can be cancelled, retried, or cleared from settings.
-- Audio Mode never starts until model verification succeeds.
-
-If Chrome Web Store review treats remotely downloaded ONNX assets as remote hosted code, the release package will bundle the selected quantized model instead. No runtime code path downloads JavaScript or WebAssembly.
+- Chrome owns and installs the on-device English speech-recognition language pack.
+- PanSub checks pack availability only after explicit Audio Mode intent.
+- Download and preparation states are reported through the popup and floating controls.
+- PanSub does not download or execute third-party recognition code or model files.
+- Audio Mode never starts until Chrome reports the local language pack as available.
+- The user can cancel PanSub's waiting state; browser-managed model removal remains a Chrome responsibility.
 
 ## Permissions and Privacy
 
@@ -159,7 +159,7 @@ Manifest changes:
 - add `activeTab` as required so a toolbar invocation grants temporary access to the selected tab without a broad host expansion;
 - add `offscreen` as required for the hidden audio runtime;
 - declare `tabCapture` as optional and request it only when Audio Mode is enabled;
-- set an appropriate minimum Chrome version after the feasibility spike.
+- set `minimum_chrome_version` to `139`.
 
 Before the first session, the user sees a prominent disclosure covering:
 
@@ -176,7 +176,7 @@ Privacy policy, store listing, permission justifications, and release notes must
 
 - Permission denied: remain in `available` and explain how to retry.
 - Unsupported Chrome version: keep native-caption mode fully functional.
-- Model download interruption: retain resumable progress when safe, otherwise restart cleanly.
+- Language-pack installation interruption: return to `available` and let Chrome report whether a later retry resumes or restarts the browser-managed download.
 - Checksum mismatch: delete the asset and refuse to load it.
 - Silent tab: show `Waiting for tab audio` without generating empty subtitles.
 - Capture ended or tab closed: stop the session and clear the overlay state.
@@ -191,10 +191,10 @@ Before full integration, a focused spike must prove:
 
 1. `tabCapture` can start reliably from the popup after runtime permission consent.
 2. Captured audio remains audible after routing through the offscreen `AudioContext`.
-3. The selected Sherpa-ONNX WebAssembly build works under MV3 CSP without remote executable code.
-4. Streaming recognition stays near realtime on representative Windows hardware.
+3. `SpeechRecognition.start(audioTrack)` accepts the captured tab-audio track inside the offscreen document.
+4. Chrome's on-device English recognizer stays near realtime on representative Windows hardware.
 5. Chrome Translator API can be initialized and reused in an extension context; otherwise the separately disclosed Google fallback is offered for MVP and requires explicit consent.
-6. The model delivery approach passes package and remote-code policy checks.
+6. The packaged extension contains no remote speech-recognition code or model assets.
 
 Failure of a preferred path does not block the feature when its explicit fallback succeeds.
 
@@ -209,13 +209,13 @@ Automated coverage must include:
 - stale recognition and translation cancellation;
 - local translator and Google fallback routing;
 - capture cleanup and zero retained audio buffers after stop;
-- model checksum and cache behavior;
+- local language-pack availability, installation, cancellation, and retry;
 - native-caption priority and return to `Auto`;
 - popup/floating-control state synchronization;
 - reduced motion and keyboard accessibility;
 - package audit confirming no remote JavaScript or WebAssembly.
 
-Manual Chrome verification must cover normal and fullscreen Panopto playback, tab navigation, pause/resume, silent sections, long lectures, model download cancellation, CPU throttling, and extension reload during a session.
+Manual Chrome verification must cover normal and fullscreen Panopto playback, tab navigation, pause/resume, silent sections, long lectures, leaving and retrying language-pack preparation, CPU throttling, and extension reload during a session.
 
 ## Non-goals for the Beta
 
@@ -238,4 +238,4 @@ Audio Mode Beta is ready for PR review when:
 - no audio or full transcript survives stop/reload;
 - permissions and privacy disclosures match runtime behavior;
 - the extension remains usable when Audio Mode is unsupported or declined;
-- the release ZIP contains all executable runtime assets and passes MV3 validation.
+- the release ZIP contains no remote executable dependencies and passes MV3 validation.
