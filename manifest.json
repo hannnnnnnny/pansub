@@ -14,7 +14,7 @@
       "matches": [
         "https://*.panopto.com/*"
       ],
-      "js": ["settings.js", "glossary.js", "audio-mode-protocol.js", "audio-mode-state.js", "content.js"],
+      "js": ["settings.js", "glossary.js", "glossary-utils.js", "audio-mode-protocol.js", "audio-mode-state.js", "content.js"],
       "run_at": "document_idle"
     }
   ],

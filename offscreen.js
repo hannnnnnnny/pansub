@@ -1,6 +1,7 @@
 (() => {
   const { messages } = globalThis.PANSUB_AUDIO_PROTOCOL;
   const { createLocalRecognizer } = globalThis.PANSUB_AUDIO_RECOGNIZER;
+  const { createAudioTranslator, createTranslationScheduler } = globalThis.PANSUB_AUDIO_TRANSLATOR;
 
   let session = null;
 
@@ -24,6 +25,7 @@
   async function releaseSession(current, emitStopped = true, reason = 'user') {
     if (!current) return;
     try {
+      current.translationScheduler?.stop();
       current.recognizer?.stop();
     } catch (error) {
       // Continue releasing the media graph.
@@ -70,7 +72,9 @@
       recognitionTrack: null,
       audioContext: null,
       sourceNode: null,
-      recognizer: null
+      recognizer: null,
+      translator: null,
+      translationScheduler: null
     };
     session = current;
     await sendEvent(current.id, 'PREPARING');
@@ -96,17 +100,42 @@
         await current.audioContext.resume();
       }
 
+      const sourceLanguage = message.settings?.sourceLanguage || 'en-US';
+      current.translator = createAudioTranslator({
+        TranslatorClass: globalThis.Translator || null,
+        sourceLanguage: sourceLanguage.split('-')[0],
+        targetLanguage: message.settings?.targetLanguage || 'zh-CN',
+        allowGoogleFallback: message.settings?.allowGoogleFallback === true,
+        glossary: globalThis.PANSUB_GLOSSARY || { terms: [] },
+        glossaryEnabled: message.settings?.glossaryEnabled !== false
+      });
+      current.translationScheduler = createTranslationScheduler({
+        translator: current.translator,
+        emit(event) {
+          if (session !== current) return;
+          if (event.kind === 'subtitle') {
+            void sendEvent(current.id, 'SUBTITLE', {
+              sequence: event.sequence,
+              text: event.text,
+              final: event.final,
+              provider: event.provider
+            });
+            return;
+          }
+          if (event.kind === 'error') {
+            void sendEvent(current.id, 'ERROR', { error: event.code });
+            void releaseSession(current, false, 'translation-error');
+          }
+        }
+      });
+
       current.recognizer = createLocalRecognizer({
         Recognition: recognitionConstructor(),
-        language: message.settings?.sourceLanguage || 'en-US',
+        language: sourceLanguage,
         emit(event) {
           if (session !== current) return;
           if (event.kind === 'partial' || event.kind === 'final') {
-            void sendEvent(current.id, 'TRANSCRIPT', {
-              kind: event.kind,
-              text: event.text,
-              confidence: event.confidence
-            });
+            current.translationScheduler.push(event);
             return;
           }
           if (event.kind === 'degraded') {
@@ -118,7 +147,10 @@
           }
         }
       });
-      await current.recognizer.prepare();
+      await Promise.all([
+        current.recognizer.prepare(),
+        current.translator.prepare()
+      ]);
       if (session !== current) return;
       current.recognizer.start(current.recognitionTrack);
       await sendEvent(current.id, 'LISTENING');

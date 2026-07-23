@@ -69,8 +69,23 @@ async function run() {
     console,
     setTimeout,
     clearTimeout,
+    AbortController,
     AudioContext: FakeAudioContext,
     SpeechRecognition: class {},
+    Translator: class FakeTranslator {
+      static async availability() {
+        return 'available';
+      }
+
+      static async create() {
+        return {
+          async translate(text) {
+            return `译文：${text}`;
+          },
+          destroy() {}
+        };
+      }
+    },
     navigator: {
       mediaDevices: {
         async getUserMedia(constraints) {
@@ -119,6 +134,9 @@ async function run() {
   context.window = context;
 
   vm.runInContext(fs.readFileSync(path.join(root, 'audio-mode-protocol.js'), 'utf8'), context, { filename: 'audio-mode-protocol.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'glossary.js'), 'utf8'), context, { filename: 'glossary.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'glossary-utils.js'), 'utf8'), context, { filename: 'glossary-utils.js' });
+  vm.runInContext(fs.readFileSync(path.join(root, 'audio-translator.js'), 'utf8'), context, { filename: 'audio-translator.js' });
   vm.runInContext(fs.readFileSync(path.join(root, 'offscreen.js'), 'utf8'), context, { filename: 'offscreen.js' });
   assert.strictEqual(listeners.length, 1);
 
@@ -137,7 +155,12 @@ async function run() {
     type: 'PANSUB_AUDIO_CAPTURE_START',
     sessionId: 'session-1',
     streamId: 'stream-1',
-    settings: { sourceLanguage: 'en-US' }
+    settings: {
+      sourceLanguage: 'en-US',
+      targetLanguage: 'zh-CN',
+      allowGoogleFallback: false,
+      glossaryEnabled: true
+    }
   });
 
   assert.strictEqual(mediaRequests[0].audio.mandatory.chromeMediaSource, 'tab');
@@ -147,9 +170,13 @@ async function run() {
   assert.strictEqual(recognizers[0].startedTrack, recognitionTrack);
   assert(messages.some((message) => message.event === 'LISTENING'));
 
-  recognizers[0].emit({ kind: 'partial', text: 'database schema', confidence: 0.8 });
-  assert.strictEqual(messages.at(-1).event, 'TRANSCRIPT');
-  assert.strictEqual(messages.at(-1).text, 'database schema');
+  recognizers[0].emit({ kind: 'final', text: 'database schema', confidence: 0.8 });
+  for (let attempt = 0; attempt < 20 && !messages.some((message) => message.event === 'SUBTITLE'); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  const subtitle = messages.find((message) => message.event === 'SUBTITLE');
+  assert(subtitle, 'translated subtitle should be emitted');
+  assert(subtitle.text.startsWith('译文：'));
 
   await dispatch({
     type: 'PANSUB_AUDIO_CAPTURE_STOP',
