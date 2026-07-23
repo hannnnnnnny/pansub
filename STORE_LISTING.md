@@ -105,10 +105,10 @@ Permission justification for `offscreen`:
 Used to maintain the user-started tab audio stream and Chrome on-device speech recognition after the popup closes. No offscreen UI, audio storage, analytics, or tracking is used.
 ```
 
-Optional permission justification for `tabCapture`:
+Permission justification for `tabCapture`:
 
 ```text
-Requested only when the user clicks Start listening. It captures audio only from that active Panopto tab for Chrome on-device speech recognition and is released when Audio Mode stops.
+Used only when the user clicks Start listening. Chrome also requires this direct extension invocation before capture can begin. It captures audio only from that active Panopto tab for on-device speech recognition and is released when Audio Mode stops.
 ```
 
 Host permission justification:
@@ -146,7 +146,7 @@ Publish automatically after review: Off for staged review, On if you want immedi
 Extension package:
 
 ```text
-dist/pansub-1.1.16.zip
+dist/pansub-1.2.0.zip
 ```
 
 Icon:
@@ -283,10 +283,10 @@ Used after a direct user action to identify the active Panopto recording tab whe
 Used to maintain the user-started tab audio stream and Chrome on-device speech recognition after the popup closes. No offscreen UI, audio storage, analytics, or tracking is used.
 ```
 
-可选 `tabCapture` 权限解释：
+`tabCapture` 权限解释：
 
 ```text
-Requested only when the user clicks Start listening. It captures audio only from that active Panopto tab for Chrome on-device speech recognition and is released when Audio Mode stops.
+Used only when the user clicks Start listening. Chrome also requires this direct extension invocation before capture can begin. It captures audio only from that active Panopto tab for on-device speech recognition and is released when Audio Mode stops.
 ```
 
 Panopto 域名权限解释：

@@ -36,7 +36,7 @@ PanSub exposes three source modes:
 
 When no native caption is detected for several seconds, the floating PanSub button shows an amber status dot. Opening the floating panel explains that no captions were found and presents an Audio Mode action.
 
-The canonical start action is in the extension popup. The popup requests the optional `tabCapture` permission at runtime, explains why it is needed, and starts capture in the active Panopto tab. This avoids a broad installation-time permission prompt and satisfies Chrome's user-invocation requirement.
+The canonical start action is in the extension popup. The popup explains why capture is needed and starts capture only after the user's direct click. `tabCapture` is declared as a required API permission because extension-load testing showed that contexts already running before an optional grant do not receive the API binding reliably. Chrome still prevents capture without direct extension invocation.
 
 The floating panel's start action opens the extension popup with Audio Mode focused. The final `Start listening` click occurs in the popup, where Chrome can reliably associate it with extension invocation and permission consent. Stop actions do not require new permission and remain available directly from both surfaces.
 
@@ -46,7 +46,7 @@ The popup and floating control share one state machine:
 
 1. `native`: translating native captions.
 2. `available`: no captions detected; Audio Mode can be started.
-3. `permission`: waiting for optional capture permission.
+3. `permission`: validating the user-started capture session.
 4. `downloading`: Chrome is preparing or downloading its local English language pack; PanSub shows an indeterminate status and lets the user leave the waiting state.
 5. `warming`: loading the recognizer and translator.
 6. `listening`: capturing tab audio and producing streaming subtitles.
@@ -158,7 +158,7 @@ Manifest changes:
 - keep `storage` as required;
 - add `activeTab` as required so a toolbar invocation grants temporary access to the selected tab without a broad host expansion;
 - add `offscreen` as required for the hidden audio runtime;
-- declare `tabCapture` as optional and request it only when Audio Mode is enabled;
+- declare `tabCapture` explicitly, disclose it in the store listing, and invoke it only after Audio Mode is started;
 - set `minimum_chrome_version` to `139`.
 
 Before the first session, the user sees a prominent disclosure covering:
@@ -189,7 +189,7 @@ Privacy policy, store listing, permission justifications, and release notes must
 
 Before full integration, a focused spike must prove:
 
-1. `tabCapture` can start reliably from the popup after runtime permission consent.
+1. `tabCapture` can start reliably from the popup after the in-product disclosure and direct user action.
 2. Captured audio remains audible after routing through the offscreen `AudioContext`.
 3. `SpeechRecognition.start(audioTrack)` accepts the captured tab-audio track inside the offscreen document.
 4. Chrome's on-device English recognizer stays near realtime on representative Windows hardware.

@@ -4,7 +4,9 @@
 
 **Goal:** Add an explicitly started, no-cost Audio Mode that captures the active Panopto tab, performs English speech recognition locally in Chrome, translates the recognized text, and renders it in the existing PanSub overlay.
 
-**Architecture:** The popup requests optional tab-capture permission and asks the service worker to create one active session. An offscreen extension page consumes the tab audio, keeps playback audible, and runs Chrome's on-device Web Speech recognizer against the captured audio track. The service worker relays normalized status and subtitle events to the Panopto content script, which reuses PanSub's glossary, translation guards, fullscreen mounting, and draggable overlay.
+**Architecture:** The popup obtains explicit in-product consent and asks the service worker to create one active tab-capture session. An offscreen extension page consumes the tab audio, keeps playback audible, and runs Chrome's on-device Web Speech recognizer against the captured audio track. The service worker relays normalized status and subtitle events to the Panopto content script, which reuses PanSub's glossary, translation guards, fullscreen mounting, and draggable overlay.
+
+**Verified deviation:** A real MV3 extension-load test showed that an already-running service worker did not receive the `chrome.tabCapture` binding immediately after an optional runtime grant. The release therefore declares `tabCapture` as a required API permission, while Chrome and PanSub still require a direct Start click before any capture occurs.
 
 **Tech Stack:** Chrome Manifest V3, `chrome.tabCapture`, `chrome.offscreen`, Web Audio, on-device Web Speech API, Chrome Translator API with explicitly consented Google text fallback, vanilla JavaScript, Node assertions, Playwright.
 
@@ -36,7 +38,7 @@
 - `settings.js`: source mode, Audio Mode consent, and spoken-language defaults.
 - `popup.html`, `popup.css`, `popup.js`: Audio Mode start/stop, disclosure, preparation, and status UI.
 - `content.js`: native-caption availability reporting, audio event rendering, floating status, and return to Auto.
-- `manifest.json`: Chrome 139 floor plus `activeTab`, `offscreen`, and optional `tabCapture` permissions.
+- `manifest.json`: Chrome 139 floor plus `activeTab`, `offscreen`, and `tabCapture` permissions.
 - `tests/audio-mode-state.test.js`: reducer and stale-session tests.
 - `tests/audio-recognizer.test.js`: browser-recognizer adapter tests with fakes.
 - `tests/audio-translator.test.js`: local/fallback/consent tests.
@@ -162,8 +164,7 @@ Set manifest fields:
 
 ```json
 "minimum_chrome_version": "139",
-"permissions": ["storage", "activeTab", "offscreen"],
-"optional_permissions": ["tabCapture"],
+"permissions": ["storage", "activeTab", "offscreen", "tabCapture"],
 ```
 
 Implement start sequencing:
@@ -443,7 +444,7 @@ git commit -m "feat: render audio mode in subtitle controls"
 - Modify: `tests/popup-smoke.js`
 
 **Interfaces:**
-- Popup requests `chrome.permissions.request({ permissions: ['tabCapture'] })` inside the Start click.
+- Popup requires an explicit disclosure confirmation and Start click before asking the coordinator to capture.
 - Popup sends `PANSUB_AUDIO_START`, `PANSUB_AUDIO_STOP`, and `PANSUB_AUDIO_GET_STATE`.
 - Popup persists disclosure and Google text-fallback consent only after explicit checkbox confirmation.
 
@@ -468,12 +469,10 @@ Expected: FAIL because `#audioStart` does not exist.
 
 - [ ] **Step 3: Build the Audio Mode popup panel**
 
-Add a compact source segmented control (`Auto`, `Native`, `Tab audio`), amber no-caption callout, disclosure sheet, local-language-pack preparation state, listening timer, Stop command, and actionable errors. Start remains disabled until the disclosure is checked. Request permission directly in the click handler:
+Add a compact source segmented control (`Auto`, `Native`, `Tab audio`), amber no-caption callout, disclosure sheet, local-language-pack preparation state, listening timer, Stop command, and actionable errors. Start remains disabled until the disclosure is checked, and capture starts only from that direct click:
 
 ```js
 async function confirmAudioStart() {
-  const granted = await chrome.permissions.request({ permissions: ['tabCapture'] });
-  if (!granted) return renderAudioError('permissionDenied');
   await saveAudioConsent();
   const state = await chrome.runtime.sendMessage({ type: 'PANSUB_AUDIO_START' });
   renderAudioState(state);
@@ -536,7 +535,7 @@ Add Audio Mode settings for source language, consent review/reset, compatibility
 PanSub captures audio only from the tab you explicitly start. Chrome performs English speech recognition on this device. PanSub does not save the audio or a transcript. If Chrome's local Translator is unavailable, recognized text is sent to Google Translate only after you separately allow that fallback.
 ```
 
-Update README installation/use screenshots and Store listing permission reasons for `activeTab`, `offscreen`, optional `tabCapture`, and `storage`. Add real-Chrome steps covering audible playback, language-pack installation, fullscreen, stop cleanup, and measured speech-to-subtitle latency.
+Update README installation/use screenshots and Store listing permission reasons for `activeTab`, `offscreen`, `tabCapture`, and `storage`. Add real-Chrome steps covering audible playback, language-pack installation, fullscreen, stop cleanup, and measured speech-to-subtitle latency.
 
 - [ ] **Step 4: Run options, policy, and full tests**
 
@@ -568,7 +567,7 @@ git commit -m "docs: disclose local audio translation mode"
 ```js
 assert.strictEqual(manifest.minimum_chrome_version, '139');
 assert(manifest.permissions.includes('offscreen'));
-assert(manifest.optional_permissions.includes('tabCapture'));
+assert(manifest.permissions.includes('tabCapture'));
 assert(packageEntries.includes('offscreen.html'));
 assert(packageEntries.includes('audio-recognizer.js'));
 assert(!packageEntries.some((name) => name.includes('node_modules') || name.endsWith('.pdf')));

@@ -220,19 +220,6 @@ function runtimeRequest(message) {
   });
 }
 
-function requestTabCapturePermission() {
-  return new Promise((resolve) => {
-    let settled = false;
-    const finish = (granted) => {
-      if (settled) return;
-      settled = true;
-      resolve(granted === true);
-    };
-    const result = chrome.permissions.request({ permissions: ['tabCapture'] }, finish);
-    result?.then?.(finish, () => finish(false));
-  });
-}
-
 function persistSettings() {
   return new Promise((resolve, reject) => {
     chrome.storage.local.set({
@@ -314,12 +301,6 @@ function save() {
 }
 
 async function requestAndStart() {
-  const granted = await requestTabCapturePermission();
-  if (!granted) {
-    audioState = { ...audioState, phase: 'error', source: 'audio', error: 'PERMISSION_DENIED' };
-    render();
-    return;
-  }
   settings = { ...settings, subtitleSource: 'audio' };
   await persistSettings();
   try {

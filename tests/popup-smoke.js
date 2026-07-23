@@ -8,7 +8,6 @@ const root = path.resolve(__dirname, '..');
 async function installChromeMock(page) {
   await page.addInitScript(() => {
     const runtimeListeners = [];
-    const permissionRequests = [];
     const runtimeMessages = [];
     const store = {
       pansubEnabled: true,
@@ -27,7 +26,6 @@ async function installChromeMock(page) {
 
     window.__pansubStore = store;
     window.__pansubOptionsOpened = 0;
-    window.__pansubPermissionRequests = permissionRequests;
     window.__pansubRuntimeMessages = runtimeMessages;
     window.__pansubRuntimeListeners = runtimeListeners;
     window.chrome = {
@@ -42,13 +40,6 @@ async function installChromeMock(page) {
             Object.assign(store, next);
             callback?.();
           }
-        }
-      },
-      permissions: {
-        request(options, callback) {
-          permissionRequests.push(options);
-          callback?.(true);
-          return Promise.resolve(true);
         }
       },
       runtime: {
@@ -118,8 +109,6 @@ async function main() {
   await page.check('#audioDisclosureAccepted');
   await page.click('#audioConfirmStart');
   await page.waitForFunction(() => window.__pansubRuntimeMessages.some((message) => message.type === 'PANSUB_AUDIO_START'));
-  const permissionRequests = await page.evaluate(() => window.__pansubPermissionRequests);
-  assert.strictEqual(permissionRequests[0].permissions[0], 'tabCapture');
   assert.strictEqual(await page.evaluate(() => window.__pansubStore.pansubSettings.audioDisclosureAccepted), true);
 
   await dispatchRuntimeMessage(page, {

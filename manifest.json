@@ -2,10 +2,9 @@
   "manifest_version": 3,
   "minimum_chrome_version": "139",
   "name": "PanSub - Panopto 中文字幕",
-  "version": "1.1.16",
+  "version": "1.2.0",
   "description": "实时翻译 Panopto 视频英文字幕为中文，叠加显示在播放器上方。",
-  "permissions": ["storage", "activeTab", "offscreen"],
-  "optional_permissions": ["tabCapture"],
+  "permissions": ["storage", "activeTab", "offscreen", "tabCapture"],
   "host_permissions": [
     "https://*.panopto.com/*"
   ],

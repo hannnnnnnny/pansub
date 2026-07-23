@@ -46,7 +46,7 @@ PanSub requests:
 - `storage`, used for settings and local translation cache
 - `activeTab`, used to identify the Panopto tab where the user starts Audio Mode
 - `offscreen`, used to keep the user-started tab audio stream and on-device recognition alive while the popup is closed
-- Optional `tabCapture`, requested only when the user starts Audio Mode and used only for that tab's audio
+- `tabCapture`, used only after the user starts Audio Mode and only for that active tab's audio
 - Access to matching Panopto domains, used to read visible captions and render the subtitle overlay
 
 ## Contact
@@ -107,7 +107,7 @@ PanSub 请求以下权限：
 - `storage`，用于保存设置和本地翻译缓存
 - `activeTab`，用于确认用户从哪个 Panopto 标签页启动音频模式
 - `offscreen`，用于在 popup 关闭后继续维持用户主动启动的标签页音频流和本地识别
-- 可选的 `tabCapture`，仅在用户启动音频模式时请求，只捕获该标签页音频
+- `tabCapture`，仅在用户启动音频模式后使用，只捕获当前标签页音频
 - Panopto 匹配域名访问权限，用于读取可见字幕并渲染字幕悬浮层
 
 ## 联系方式

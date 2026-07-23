@@ -129,7 +129,7 @@ async function run() {
   assert.strictEqual(manifest.minimum_chrome_version, '139');
   assert(manifest.permissions.includes('activeTab'));
   assert(manifest.permissions.includes('offscreen'));
-  assert(manifest.optional_permissions.includes('tabCapture'));
+  assert(manifest.permissions.includes('tabCapture'));
 
   const { chrome, calls } = createChromeMock();
   loadBackground(chrome);
