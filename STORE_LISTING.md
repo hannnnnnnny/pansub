@@ -111,6 +111,12 @@ Permission justification for `tabCapture`:
 Used only when the user clicks Start listening. Chrome also requires this direct extension invocation before capture can begin. It captures audio only from that active Panopto tab for on-device speech recognition and is released when Audio Mode stops.
 ```
 
+Optional host permission justification for `https://translate.googleapis.com/*`:
+
+```text
+Requested only after Chrome's local Translator is unavailable and the user separately allows the recognized-text fallback. It is used only to send recognized text for translation, never audio, and can be revoked from PanSub settings.
+```
+
 Host permission justification:
 
 ```text
@@ -287,6 +293,12 @@ Used to maintain the user-started tab audio stream and Chrome on-device speech r
 
 ```text
 Used only when the user clicks Start listening. Chrome also requires this direct extension invocation before capture can begin. It captures audio only from that active Panopto tab for on-device speech recognition and is released when Audio Mode stops.
+```
+
+可选 `https://translate.googleapis.com/*` 主机权限解释：
+
+```text
+Requested only after Chrome's local Translator is unavailable and the user separately allows the recognized-text fallback. It is used only to send recognized text for translation, never audio, and can be revoked from PanSub settings.
 ```
 
 Panopto 域名权限解释：

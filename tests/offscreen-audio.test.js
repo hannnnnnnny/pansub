@@ -154,6 +154,7 @@ async function run() {
   await dispatch({
     type: 'PANSUB_AUDIO_CAPTURE_START',
     sessionId: 'session-1',
+    tabId: 12,
     streamId: 'stream-1',
     settings: {
       sourceLanguage: 'en-US',
@@ -169,6 +170,10 @@ async function run() {
   assert.strictEqual(recognizers[0].prepared, true);
   assert.strictEqual(recognizers[0].startedTrack, recognitionTrack);
   assert(messages.some((message) => message.event === 'LISTENING'));
+  const activeSession = await dispatch({ type: 'PANSUB_AUDIO_CAPTURE_GET_STATE' });
+  assert.strictEqual(activeSession.session.sessionId, 'session-1');
+  assert.strictEqual(activeSession.session.tabId, 12);
+  assert.strictEqual(activeSession.session.phase, 'listening');
 
   recognizers[0].emit({ kind: 'final', text: 'database schema', confidence: 0.8 });
   for (let attempt = 0; attempt < 20 && !messages.some((message) => message.event === 'SUBTITLE'); attempt += 1) {
@@ -178,16 +183,44 @@ async function run() {
   assert(subtitle, 'translated subtitle should be emitted');
   assert(subtitle.text.startsWith('译文：'));
 
-  await dispatch({
+  const stoppedSession = await dispatch({
     type: 'PANSUB_AUDIO_CAPTURE_STOP',
     sessionId: 'session-1',
     reason: 'user'
   });
+  assert.strictEqual(stoppedSession.stopped, true);
   assert.strictEqual(recognizers[0].stopped, true);
   assert.strictEqual(sourceTrack.stopped, true);
   assert.strictEqual(recognitionTrack.stopped, true);
   assert.strictEqual(contexts[0].closed, true);
   assert.strictEqual(messages.at(-1).event, 'STOPPED');
+
+  sourceTrack.stopped = false;
+  sourceTrack.readyState = 'live';
+  recognitionTrack.stopped = false;
+  recognitionTrack.readyState = 'live';
+  await dispatch({
+    type: 'PANSUB_AUDIO_CAPTURE_START',
+    sessionId: 'session-2',
+    tabId: 12,
+    streamId: 'stream-2',
+    settings: {
+      sourceLanguage: 'en-US',
+      targetLanguage: 'zh-CN',
+      allowGoogleFallback: false,
+      glossaryEnabled: true
+    }
+  });
+  recognizers[1].emit({ kind: 'error', code: 'audio-capture' });
+  for (let attempt = 0; attempt < 20 && !contexts[1].closed; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
+  assert.strictEqual(recognizers[1].stopped, true, 'recognition error should stop recognizer');
+  assert.strictEqual(sourceTrack.stopped, true, 'recognition error should release source track');
+  assert.strictEqual(recognitionTrack.stopped, true, 'recognition error should release recognition track');
+  assert.strictEqual(contexts[1].closed, true, 'recognition error should close audio context');
+  const releasedSession = await dispatch({ type: 'PANSUB_AUDIO_CAPTURE_GET_STATE' });
+  assert.strictEqual(releasedSession.session, null);
 
   console.log('Offscreen audio runtime tests passed');
 }

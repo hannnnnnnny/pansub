@@ -15,7 +15,7 @@ async function installChromeMock(page) {
         ...window.PANSUB_DEFAULT_SETTINGS,
         enabled: true,
         interfaceLanguage: 'en',
-        displayMode: 'translation',
+        displayMode: 'bilingual',
         subtitleSource: 'auto'
       },
       pansubCache: {}
@@ -92,6 +92,7 @@ async function main() {
       <body style="margin:0;background:#111;color:white;font-family:sans-serif">
         <main id="rightPlayerContainer" style="position:relative;width:900px;height:520px;background:#222;margin:30px auto;overflow:hidden">
           <video class="video-js" style="width:900px;height:520px;display:block"></video>
+          <div id="overlayCaption" style="position:absolute;left:100px;bottom:24px;width:700px;height:40px"></div>
         </main>
       </body>
     </html>`);
@@ -104,6 +105,9 @@ async function main() {
   await page.addScriptTag({ path: path.join(root, 'audio-mode-state.js') });
   await page.addScriptTag({ path: path.join(root, 'content.js') });
   await page.waitForSelector('#pansub-floating');
+  await page.waitForFunction(() => window.__pansubSentMessages.some((message) => (
+    message.type === 'PANSUB_NATIVE_CAPTION_STATUS' && message.hasCaptions === false
+  )), null, { timeout: 7000 });
 
   await dispatchRuntimeMessage(page, {
     type: 'PANSUB_AUDIO_STATE_CHANGED',
@@ -126,6 +130,12 @@ async function main() {
   const sentTypes = await page.evaluate(() => window.__pansubSentMessages.map((message) => message.type));
   assert(sentTypes.includes('PANSUB_OPEN_AUDIO_POPUP'));
 
+  await page.locator('#overlayCaption').evaluate((element) => {
+    element.textContent = 'A primary key identifies a database record.';
+  });
+  await page.waitForTimeout(700);
+  assert((await page.locator('#pansub-original').textContent()).includes('primary key'));
+
   await dispatchRuntimeMessage(page, {
     type: 'PANSUB_AUDIO_STATE_CHANGED',
     state: {
@@ -138,6 +148,8 @@ async function main() {
       updatedAt: 20
     }
   });
+  assert.strictEqual(await page.locator('#pansub-original').textContent(), '', 'Audio Mode should clear native caption work immediately');
+  assert.strictEqual((await page.locator('#pansub-translated').textContent()).trim(), '', 'Audio Mode should clear stale native translation immediately');
   await dispatchRuntimeMessage(page, {
     type: 'PANSUB_AUDIO_SUBTITLE',
     sessionId: 'session-1',

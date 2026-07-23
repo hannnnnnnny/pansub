@@ -31,6 +31,7 @@ Use Chrome 139 or later with the unpacked `feature/audio-mode` build.
 2. Confirm PanSub stops with a separate text-fallback disclosure instead of silently sending recognized text.
 3. Decline and confirm no Google Translate request occurs.
 4. Repeat, allow the fallback, and confirm only recognized text is sent to `translate.googleapis.com`.
+5. Confirm Chrome requests the optional `translate.googleapis.com` host access at this point, not when Audio Mode first starts.
 
 ## Regression
 

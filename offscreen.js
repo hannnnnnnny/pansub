@@ -57,10 +57,14 @@
   }
 
   async function stopSession(sessionId, reason = 'user') {
-    if (!session || (sessionId && session.id !== sessionId)) return;
+    if (!session) return { stopped: false, sessionId: null };
+    if (sessionId && session.id !== sessionId) {
+      return { stopped: false, sessionId: session.id };
+    }
     const current = session;
     session = null;
     await releaseSession(current, true, reason);
+    return { stopped: true, sessionId: current.id };
   }
 
   async function startSession(message) {
@@ -68,6 +72,8 @@
 
     const current = {
       id: message.sessionId,
+      tabId: message.tabId,
+      phase: 'preparing',
       stream: null,
       recognitionTrack: null,
       audioContext: null,
@@ -123,6 +129,7 @@
             return;
           }
           if (event.kind === 'error') {
+            current.phase = 'error';
             void sendEvent(current.id, 'ERROR', { error: event.code });
             void releaseSession(current, false, 'translation-error');
           }
@@ -139,11 +146,16 @@
             return;
           }
           if (event.kind === 'degraded') {
+            current.phase = 'degraded';
             void sendEvent(current.id, 'DEGRADED', { detail: event.code });
             return;
           }
           if (event.kind === 'error') {
-            void sendEvent(current.id, 'ERROR', { error: event.code });
+            current.phase = 'error';
+            void (async () => {
+              await sendEvent(current.id, 'ERROR', { error: event.code });
+              await releaseSession(current, false, 'recognition-error');
+            })();
           }
         }
       });
@@ -153,8 +165,10 @@
       ]);
       if (session !== current) return;
       current.recognizer.start(current.recognitionTrack);
+      current.phase = 'listening';
       await sendEvent(current.id, 'LISTENING');
     } catch (error) {
+      current.phase = 'error';
       if (session === current) {
         await sendEvent(current.id, 'ERROR', {
           error: error?.code || error?.message || 'AUDIO_RUNTIME_FAILED'
@@ -177,9 +191,22 @@
     }
     if (message?.type === messages.CAPTURE_STOP) {
       stopSession(message.sessionId, message.reason)
-        .then(() => sendResponse({ ok: true }))
+        .then((result) => sendResponse({ ok: true, ...result }))
         .catch((error) => sendResponse({ ok: false, error: error?.message || 'AUDIO_STOP_FAILED' }));
       return true;
+    }
+    if (message?.type === messages.CAPTURE_GET_STATE) {
+      sendResponse({
+        ok: true,
+        session: session
+          ? {
+              sessionId: session.id,
+              tabId: session.tabId,
+              phase: session.phase
+            }
+          : null
+      });
+      return false;
     }
     return false;
   });

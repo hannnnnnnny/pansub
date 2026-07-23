@@ -48,6 +48,7 @@ PanSub requests:
 - `offscreen`, used to keep the user-started tab audio stream and on-device recognition alive while the popup is closed
 - `tabCapture`, used only after the user starts Audio Mode and only for that active tab's audio
 - Access to matching Panopto domains, used to read visible captions and render the subtitle overlay
+- Optional access to `translate.googleapis.com`, requested only if the user allows Audio Mode's recognized-text fallback and removable from PanSub settings
 
 ## Contact
 
@@ -109,6 +110,7 @@ PanSub 请求以下权限：
 - `offscreen`，用于在 popup 关闭后继续维持用户主动启动的标签页音频流和本地识别
 - `tabCapture`，仅在用户启动音频模式后使用，只捕获当前标签页音频
 - Panopto 匹配域名访问权限，用于读取可见字幕并渲染字幕悬浮层
+- 可选的 `translate.googleapis.com` 访问权限，仅在用户允许音频模式的识别文字回退时请求，可在 PanSub 设置中撤销
 
 ## 联系方式
 

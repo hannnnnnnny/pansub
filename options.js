@@ -652,6 +652,13 @@ document.getElementById('resetAudioConsent').addEventListener('click', () => {
     pansubEnabled: settings.enabled
   });
   try {
+    chrome.permissions?.remove?.({
+      origins: ['https://translate.googleapis.com/*']
+    }, () => {});
+  } catch (_) {
+    // Consent remains revoked even if Chrome has already removed the host grant.
+  }
+  try {
     chrome.runtime?.sendMessage?.({ type: 'PANSUB_AUDIO_STOP' }, () => void chrome.runtime.lastError);
   } catch (_) {
     // Settings remain revoked even when no Audio Mode session is running.

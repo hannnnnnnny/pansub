@@ -22,10 +22,18 @@
       .trim();
   }
 
+  function chromeTranslatorLanguage(language) {
+    if (language === 'zh-CN') return 'zh';
+    if (language === 'zh-TW') return 'zh-Hant';
+    return String(language || '').split('-')[0];
+  }
+
   function createAudioTranslator(options = {}) {
     const TranslatorClass = options.TranslatorClass || null;
     const sourceLanguage = options.sourceLanguage || 'en';
     const targetLanguage = options.targetLanguage || 'zh-CN';
+    const localSourceLanguage = chromeTranslatorLanguage(sourceLanguage);
+    const localTargetLanguage = chromeTranslatorLanguage(targetLanguage);
     const allowGoogleFallback = options.allowGoogleFallback === true;
     const fetchImpl = options.fetchImpl || globalThis.fetch?.bind(globalThis);
     const glossary = options.glossary || { terms: [] };
@@ -37,7 +45,10 @@
       if (!TranslatorClass
         || typeof TranslatorClass.availability !== 'function'
         || typeof TranslatorClass.create !== 'function') return null;
-      const translatorOptions = { sourceLanguage, targetLanguage };
+      const translatorOptions = {
+        sourceLanguage: localSourceLanguage,
+        targetLanguage: localTargetLanguage
+      };
       try {
         const availability = await TranslatorClass.availability(translatorOptions);
         if (availability === 'unavailable') return null;

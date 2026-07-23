@@ -55,6 +55,7 @@ async function installChromeMock(page) {
     };
 
     window.__pansubStore = store;
+    window.__pansubPermissionRemovals = [];
     window.chrome = {
       storage: {
         local: {
@@ -88,6 +89,13 @@ async function installChromeMock(page) {
             listeners.push(listener);
           }
         }
+      },
+      permissions: {
+        remove(options, callback) {
+          window.__pansubPermissionRemovals.push(options);
+          callback?.(true);
+          return Promise.resolve(true);
+        }
       }
     };
   }, settings({
@@ -120,6 +128,8 @@ async function main() {
   const audioPrivacy = await page.evaluate(() => window.__pansubStore.pansubSettings);
   assert.strictEqual(audioPrivacy.audioGoogleFallbackConsent, false);
   assert.strictEqual(audioPrivacy.subtitleSource, 'auto');
+  const permissionRemovals = await page.evaluate(() => window.__pansubPermissionRemovals);
+  assert.deepStrictEqual(permissionRemovals[0].origins, ['https://translate.googleapis.com/*']);
 
   await page.keyboard.press('Control+K');
   await page.waitForSelector('#commandPalette:not([hidden])');

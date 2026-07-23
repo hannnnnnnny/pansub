@@ -233,6 +233,60 @@ function persistSettings() {
   });
 }
 
+function requestGoogleFallbackAccess() {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (granted) => {
+      if (settled) return;
+      settled = true;
+      resolve(granted === true);
+    };
+    try {
+      const result = chrome.permissions.request({
+        origins: ['https://translate.googleapis.com/*']
+      }, finish);
+      result?.then?.(finish, () => finish(false));
+    } catch (_) {
+      finish(false);
+    }
+  });
+}
+
+function chromeTranslatorLanguage(language) {
+  if (language === 'zh-CN') return 'zh';
+  if (language === 'zh-TW') return 'zh-Hant';
+  return String(language || '').split('-')[0];
+}
+
+function primeLocalAudioModels() {
+  const tasks = [];
+  const Recognition = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
+  if (typeof Recognition?.install === 'function') {
+    try {
+      tasks.push(Promise.resolve(Recognition.install({
+        langs: [settings.audioSourceLanguage || 'en-US'],
+        processLocally: true,
+        quality: 'dictation'
+      })));
+    } catch (_) {
+      // The offscreen runtime reports an actionable error if installation is unavailable.
+    }
+  }
+
+  if (typeof globalThis.Translator?.create === 'function') {
+    try {
+      const translatorTask = Promise.resolve(globalThis.Translator.create({
+        sourceLanguage: 'en',
+        targetLanguage: chromeTranslatorLanguage(settings.targetLanguage || 'zh-CN')
+      })).then((translator) => translator?.destroy?.());
+      tasks.push(translatorTask);
+    } catch (_) {
+      // A separately consented text fallback remains available when local translation is unsupported.
+    }
+  }
+  return Promise.allSettled(tasks);
+}
+
 function renderAudioState() {
   const phase = audioState.phase;
   const active = ['permission', 'preparing', 'listening', 'degraded', 'stopping'].includes(phase);
@@ -300,16 +354,19 @@ function save() {
   });
 }
 
-async function requestAndStart() {
+async function requestAndStart(modelPreparation = Promise.resolve()) {
   settings = { ...settings, subtitleSource: 'audio' };
+  audioState = { ...audioState, phase: 'preparing', source: 'audio', error: null };
+  disclosureOpen = false;
+  render();
   await persistSettings();
+  await modelPreparation;
   try {
     const response = await runtimeRequest({ type: AUDIO_MESSAGES.START });
     if (response.state) audioState = response.state;
   } catch (error) {
     audioState = { ...audioState, phase: 'error', source: 'audio', error: error.code || error.message };
   }
-  disclosureOpen = false;
   render();
 }
 
@@ -320,7 +377,7 @@ audioStart.addEventListener('click', () => {
     audioDisclosureAccepted.focus();
     return;
   }
-  void requestAndStart();
+  void requestAndStart(primeLocalAudioModels());
 });
 
 audioDisclosureAccepted.addEventListener('change', () => {
@@ -330,7 +387,7 @@ audioDisclosureAccepted.addEventListener('change', () => {
 audioConfirmStart.addEventListener('click', () => {
   if (!audioDisclosureAccepted.checked) return;
   settings = { ...settings, audioDisclosureAccepted: true };
-  void requestAndStart();
+  void requestAndStart(primeLocalAudioModels());
 });
 
 audioCancelStart.addEventListener('click', () => {
@@ -358,13 +415,23 @@ audioGoogleFallbackAccepted.addEventListener('change', () => {
 
 audioConfirmFallback.addEventListener('click', () => {
   if (!audioGoogleFallbackAccepted.checked) return;
-  settings = {
-    ...settings,
-    audioDisclosureAccepted: true,
-    audioGoogleFallbackConsent: true
-  };
-  audioGoogleFallback.hidden = true;
-  void requestAndStart();
+  const accessRequest = requestGoogleFallbackAccess();
+  void (async () => {
+    const granted = await accessRequest;
+    if (!granted) {
+      settings = { ...settings, audioGoogleFallbackConsent: false };
+      audioState = { ...audioState, phase: 'error', error: 'GOOGLE_HOST_PERMISSION_DENIED' };
+      render();
+      return;
+    }
+    settings = {
+      ...settings,
+      audioDisclosureAccepted: true,
+      audioGoogleFallbackConsent: true
+    };
+    audioGoogleFallback.hidden = true;
+    await requestAndStart();
+  })();
 });
 
 audioDeclineFallback.addEventListener('click', () => {

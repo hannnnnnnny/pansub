@@ -8,6 +8,9 @@
   "host_permissions": [
     "https://*.panopto.com/*"
   ],
+  "optional_host_permissions": [
+    "https://translate.googleapis.com/*"
+  ],
   "content_scripts": [
     {
       "matches": [

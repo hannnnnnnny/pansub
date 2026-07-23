@@ -9,6 +9,8 @@ async function installChromeMock(page) {
   await page.addInitScript(() => {
     const runtimeListeners = [];
     const runtimeMessages = [];
+    const localModelCalls = [];
+    const permissionRequests = [];
     const store = {
       pansubEnabled: true,
       pansubSettings: {
@@ -28,6 +30,20 @@ async function installChromeMock(page) {
     window.__pansubOptionsOpened = 0;
     window.__pansubRuntimeMessages = runtimeMessages;
     window.__pansubRuntimeListeners = runtimeListeners;
+    window.__pansubLocalModelCalls = localModelCalls;
+    window.__pansubPermissionRequests = permissionRequests;
+    class MockSpeechRecognition {}
+    MockSpeechRecognition.install = async (options) => {
+      localModelCalls.push({ api: 'speech', options });
+      return true;
+    };
+    window.SpeechRecognition = MockSpeechRecognition;
+    window.Translator = {
+      async create(options) {
+        localModelCalls.push({ api: 'translator', options });
+        return { destroy() {} };
+      }
+    };
     window.chrome = {
       storage: {
         local: {
@@ -40,6 +56,13 @@ async function installChromeMock(page) {
             Object.assign(store, next);
             callback?.();
           }
+        }
+      },
+      permissions: {
+        request(options, callback) {
+          permissionRequests.push(options);
+          callback?.(true);
+          return Promise.resolve(true);
         }
       },
       runtime: {
@@ -109,6 +132,9 @@ async function main() {
   await page.check('#audioDisclosureAccepted');
   await page.click('#audioConfirmStart');
   await page.waitForFunction(() => window.__pansubRuntimeMessages.some((message) => message.type === 'PANSUB_AUDIO_START'));
+  const localModelCalls = await page.evaluate(() => window.__pansubLocalModelCalls);
+  assert.strictEqual(localModelCalls.some((call) => call.api === 'speech' && call.options.processLocally === true), true);
+  assert.strictEqual(localModelCalls.some((call) => call.api === 'translator' && call.options.targetLanguage === 'zh'), true);
   assert.strictEqual(await page.evaluate(() => window.__pansubStore.pansubSettings.audioDisclosureAccepted), true);
 
   await dispatchRuntimeMessage(page, {
@@ -140,6 +166,11 @@ async function main() {
     }
   });
   assert.strictEqual(await page.locator('#audioGoogleFallback').isVisible(), true);
+  await page.check('#audioGoogleFallbackAccepted');
+  await page.click('#audioConfirmFallback');
+  await page.waitForFunction(() => window.__pansubStore.pansubSettings.audioGoogleFallbackConsent === true);
+  const fallbackPermission = await page.evaluate(() => window.__pansubPermissionRequests.at(-1));
+  assert.deepStrictEqual(fallbackPermission.origins, ['https://translate.googleapis.com/*']);
 
   await dispatchRuntimeMessage(page, {
     type: 'PANSUB_AUDIO_STATE_CHANGED',

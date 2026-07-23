@@ -50,6 +50,7 @@ async function run() {
   });
   await local.prepare();
   assert.strictEqual(FakeTranslator.created.length, 1);
+  assert.strictEqual(FakeTranslator.created[0].targetLanguage, 'zh');
   const localResult = await local.translate('primary key', { sequence: 1 });
   assert.deepStrictEqual(localResult, {
     sequence: 1,

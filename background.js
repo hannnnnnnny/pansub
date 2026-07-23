@@ -9,6 +9,7 @@ const PANOPTO_URL = /^https:\/\/[^/]*panopto\.com\//i;
 let activeState = createAudioState();
 const captionStatusByTab = new Map();
 let creatingOffscreen = null;
+let sessionTransition = Promise.resolve();
 
 function errorCode(error) {
   return error?.code || error?.message || String(error || 'UNKNOWN_AUDIO_ERROR');
@@ -20,6 +21,22 @@ async function sendRuntimeMessage(message) {
   } catch (error) {
     // It is valid for no popup or extension page to be listening.
   }
+}
+
+async function requestRuntimeMessage(message) {
+  const response = await chrome.runtime.sendMessage(message);
+  if (!response || response.ok === false) {
+    const error = new Error(response?.error || 'AUDIO_RUNTIME_UNAVAILABLE');
+    error.code = response?.error || 'AUDIO_RUNTIME_UNAVAILABLE';
+    throw error;
+  }
+  return response;
+}
+
+function runSessionTransition(operation) {
+  const result = sessionTransition.then(operation, operation);
+  sessionTransition = result.catch(() => {});
+  return result;
 }
 
 async function sendTabMessage(tabId, message) {
@@ -39,8 +56,19 @@ async function broadcastState(state = activeState) {
   ]);
 }
 
+async function hasOffscreenDocument() {
+  if (typeof chrome.offscreen.hasDocument === 'function') {
+    return chrome.offscreen.hasDocument();
+  }
+  const contexts = await chrome.runtime.getContexts({
+    contextTypes: ['OFFSCREEN_DOCUMENT'],
+    documentUrls: [chrome.runtime.getURL(OFFSCREEN_PATH)]
+  });
+  return contexts.length > 0;
+}
+
 async function ensureOffscreenDocument() {
-  if (await chrome.offscreen.hasDocument()) return;
+  if (await hasOffscreenDocument()) return;
   if (!creatingOffscreen) {
     creatingOffscreen = chrome.offscreen.createDocument({
       url: OFFSCREEN_PATH,
@@ -51,6 +79,36 @@ async function ensureOffscreenDocument() {
     });
   }
   await creatingOffscreen;
+}
+
+function restoreRemoteState(remote) {
+  if (!remote?.sessionId || !Number.isInteger(remote.tabId)) return null;
+  let restored = reduceAudioState(createAudioState(), {
+    type: 'START_REQUESTED',
+    sessionId: remote.sessionId,
+    tabId: remote.tabId,
+    now: Date.now()
+  });
+  const restoreEvent = {
+    listening: 'LISTENING',
+    degraded: 'DEGRADED',
+    preparing: 'CAPTURE_READY'
+  }[remote.phase] || 'CAPTURE_READY';
+  restored = reduceAudioState(restored, {
+    type: restoreEvent,
+    sessionId: remote.sessionId,
+    detail: remote.detail,
+    now: Date.now()
+  });
+  return restored;
+}
+
+async function synchronizeOffscreenState() {
+  if (activeState.sessionId || !(await hasOffscreenDocument())) return activeState;
+  const response = await requestRuntimeMessage({ type: messages.CAPTURE_GET_STATE });
+  const restored = restoreRemoteState(response.session);
+  if (restored) activeState = restored;
+  return activeState;
 }
 
 async function loadAudioSettings() {
@@ -66,6 +124,7 @@ async function loadAudioSettings() {
 }
 
 async function stopActiveSession(reason = 'user') {
+  await synchronizeOffscreenState();
   if (!activeState.sessionId) return activeState;
   const sessionId = activeState.sessionId;
   const tabId = activeState.tabId;
@@ -75,11 +134,27 @@ async function stopActiveSession(reason = 'user') {
     now: Date.now()
   });
   await broadcastState(activeState);
-  await sendRuntimeMessage({
-    type: messages.CAPTURE_STOP,
-    sessionId,
-    reason
-  });
+  try {
+    const response = await requestRuntimeMessage({
+      type: messages.CAPTURE_STOP,
+      sessionId,
+      reason
+    });
+    if (response.stopped === false && response.sessionId && response.sessionId !== sessionId) {
+      const error = new Error('AUDIO_SESSION_MISMATCH');
+      error.code = 'AUDIO_SESSION_MISMATCH';
+      throw error;
+    }
+  } catch (error) {
+    activeState = reduceAudioState(activeState, {
+      type: 'ERROR',
+      sessionId,
+      error: errorCode(error),
+      now: Date.now()
+    });
+    await broadcastState(activeState);
+    throw error;
+  }
   activeState = createAudioState(Date.now());
   const caption = captionStatusByTab.get(tabId);
   if (caption) {
@@ -130,13 +205,18 @@ async function startAudioMode() {
       sessionId,
       now: Date.now()
     });
-    await sendRuntimeMessage({
+    const response = await requestRuntimeMessage({
       type: messages.CAPTURE_START,
       sessionId,
       tabId: tab.id,
       streamId,
       settings
     });
+    if (response.sessionId && response.sessionId !== sessionId) {
+      const error = new Error('AUDIO_SESSION_MISMATCH');
+      error.code = 'AUDIO_SESSION_MISMATCH';
+      throw error;
+    }
     await broadcastState(activeState);
     return activeState;
   } catch (error) {
@@ -210,12 +290,14 @@ async function routeMessage(message, sender) {
       await chrome.runtime.openOptionsPage();
       return { ok: true };
     case messages.START:
-      return { ok: true, state: await startAudioMode() };
+      return { ok: true, state: await runSessionTransition(startAudioMode) };
     case messages.STOP:
-      return { ok: true, state: await stopActiveSession('user') };
+      return { ok: true, state: await runSessionTransition(() => stopActiveSession('user')) };
     case messages.GET_STATE:
+      await synchronizeOffscreenState();
       return { ok: true, state: activeState };
     case messages.OFFSCREEN_EVENT:
+      await synchronizeOffscreenState();
       return { ok: true, state: await handleOffscreenEvent(message) };
     case messages.NATIVE_CAPTION_STATUS:
       return { ok: true, state: await handleCaptionStatus(message, sender) };
@@ -230,7 +312,7 @@ async function routeMessage(message, sender) {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   const knownMessage = message?.type === 'PANSUB_OPEN_OPTIONS'
     || Object.values(messages).includes(message?.type);
-  if (!knownMessage || message?.type === messages.CAPTURE_START || message?.type === messages.CAPTURE_STOP) {
+  if (!knownMessage || [messages.CAPTURE_START, messages.CAPTURE_STOP, messages.CAPTURE_GET_STATE].includes(message?.type)) {
     return false;
   }
   routeMessage(message, sender)
@@ -241,10 +323,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   captionStatusByTab.delete(tabId);
-  if (activeState.tabId === tabId) void stopActiveSession('tab-closed');
+  if (activeState.tabId === tabId) void runSessionTransition(() => stopActiveSession('tab-closed'));
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
   if (activeState.tabId !== tabId || !changeInfo.url) return;
-  if (!PANOPTO_URL.test(changeInfo.url)) void stopActiveSession('navigation');
+  if (!PANOPTO_URL.test(changeInfo.url)) void runSessionTransition(() => stopActiveSession('navigation'));
 });

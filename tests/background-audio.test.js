@@ -24,7 +24,10 @@ function createChromeMock() {
     streamIds: [],
     runtimeMessages: [],
     tabMessages: [],
-    popupOpens: 0
+    popupOpens: 0,
+    getContexts: 0,
+    failStop: false,
+    offscreenSession: null
   };
   let offscreenExists = false;
 
@@ -33,7 +36,32 @@ function createChromeMock() {
       onMessage: runtimeOnMessage,
       async sendMessage(message) {
         calls.runtimeMessages.push(message);
+        if (message.type === 'PANSUB_AUDIO_CAPTURE_START') {
+          calls.offscreenSession = {
+            sessionId: message.sessionId,
+            tabId: message.tabId,
+            phase: 'preparing'
+          };
+          return { ok: true, sessionId: message.sessionId };
+        }
+        if (message.type === 'PANSUB_AUDIO_CAPTURE_STOP') {
+          if (calls.failStop) return { ok: false, error: 'AUDIO_STOP_FAILED' };
+          const matches = !message.sessionId || calls.offscreenSession?.sessionId === message.sessionId;
+          const sessionId = calls.offscreenSession?.sessionId || null;
+          if (matches) calls.offscreenSession = null;
+          return { ok: true, stopped: matches, sessionId };
+        }
+        if (message.type === 'PANSUB_AUDIO_CAPTURE_GET_STATE') {
+          return { ok: true, session: calls.offscreenSession };
+        }
         return { ok: true };
+      },
+      getURL(file) {
+        return `chrome-extension://test/${file}`;
+      },
+      async getContexts() {
+        calls.getContexts += 1;
+        return offscreenExists ? [{ contextType: 'OFFSCREEN_DOCUMENT' }] : [];
       },
       openOptionsPage() {}
     },
@@ -62,9 +90,6 @@ function createChromeMock() {
       }
     },
     offscreen: {
-      async hasDocument() {
-        return offscreenExists;
-      },
       async createDocument(options) {
         calls.offscreenCreate.push(options);
         offscreenExists = true;
@@ -87,10 +112,11 @@ function createChromeMock() {
 }
 
 function loadBackground(chrome) {
+  let uuidSequence = 0;
   const context = vm.createContext({
     chrome,
     console,
-    crypto: { randomUUID: () => 'session-1' },
+    crypto: { randomUUID: () => `session-${++uuidSequence}` },
     Date,
     setTimeout,
     clearTimeout
@@ -107,7 +133,7 @@ function loadBackground(chrome) {
 }
 
 async function dispatch(chrome, message, sender = {}) {
-  const [listener] = chrome.runtime.onMessage.listeners;
+  const listener = chrome.runtime.onMessage.listeners.at(-1);
   assert(listener, 'background should register a runtime message listener');
   return new Promise((resolve, reject) => {
     let settled = false;
@@ -138,10 +164,20 @@ async function run() {
   assert.strictEqual(started.state.phase, 'preparing');
   assert.strictEqual(started.state.sessionId, 'session-1');
   assert.strictEqual(calls.offscreenCreate.length, 1);
+  assert(calls.getContexts >= 1, 'Chrome 139 should detect offscreen documents with runtime.getContexts');
   assert.strictEqual(calls.streamIds[0].targetTabId, 12);
   const captureStart = calls.runtimeMessages.find((message) => message.type === 'PANSUB_AUDIO_CAPTURE_START');
   assert(captureStart, 'capture start should be sent to the offscreen document');
   assert.strictEqual(captureStart.streamId, 'stream-12');
+
+  loadBackground(chrome);
+  const restored = await dispatch(chrome, { type: 'PANSUB_AUDIO_GET_STATE' });
+  assert.strictEqual(restored.state.sessionId, 'session-1', 'worker restart should restore the offscreen session');
+  await dispatch(chrome, { type: 'PANSUB_AUDIO_STOP' });
+  assert.strictEqual(calls.offscreenSession, null, 'stop after worker restart should release the offscreen session');
+
+  const restarted = await dispatch(chrome, { type: 'PANSUB_AUDIO_START' });
+  assert.strictEqual(restarted.state.sessionId, 'session-1');
 
   await dispatch(chrome, {
     type: 'PANSUB_AUDIO_OFFSCREEN_EVENT',
@@ -185,6 +221,27 @@ async function run() {
 
   await dispatch(chrome, { type: 'PANSUB_OPEN_AUDIO_POPUP' });
   assert.strictEqual(calls.popupOpens, 1);
+
+  const concurrent = createChromeMock();
+  loadBackground(concurrent.chrome);
+  await Promise.all([
+    dispatch(concurrent.chrome, { type: 'PANSUB_AUDIO_START' }),
+    dispatch(concurrent.chrome, { type: 'PANSUB_AUDIO_START' })
+  ]);
+  const concurrentState = await dispatch(concurrent.chrome, { type: 'PANSUB_AUDIO_GET_STATE' });
+  assert.strictEqual(concurrentState.state.sessionId, 'session-2');
+  assert.strictEqual(concurrent.calls.offscreenSession.sessionId, 'session-2', 'latest serialized start should own capture');
+
+  const failedStop = createChromeMock();
+  loadBackground(failedStop.chrome);
+  await dispatch(failedStop.chrome, { type: 'PANSUB_AUDIO_START' });
+  failedStop.calls.failStop = true;
+  await assert.rejects(
+    () => dispatch(failedStop.chrome, { type: 'PANSUB_AUDIO_STOP' }),
+    /AUDIO_STOP_FAILED/
+  );
+  const failedStopState = await dispatch(failedStop.chrome, { type: 'PANSUB_AUDIO_GET_STATE' });
+  assert.notStrictEqual(failedStopState.state.phase, 'idle', 'failed cleanup must not report idle');
 
   console.log('Background audio coordinator tests passed');
 }

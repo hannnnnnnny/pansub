@@ -46,5 +46,6 @@ assert(listing.includes(`dist/pansub-${manifest.version}.zip`), 'store listing s
 assert(Number(manifest.minimum_chrome_version) >= 139, 'Audio Mode requires Chrome 139 or later');
 assert(manifest.permissions.includes('offscreen'), 'offscreen permission should be declared');
 assert(manifest.permissions.includes('tabCapture'), 'tabCapture permission should be declared');
+assert(manifest.optional_host_permissions.includes('https://translate.googleapis.com/*'), 'Google text fallback host should remain optional');
 
 console.log('Release package audit passed');

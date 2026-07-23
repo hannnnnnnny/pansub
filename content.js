@@ -2360,8 +2360,19 @@
     const previousSessionId = audioState.sessionId;
     const previouslyOwnedOverlay = audioOwnsOverlay();
     audioState = nextState;
+    const ownsOverlayNow = audioOwnsOverlay();
     if (audioState.sessionId !== previousSessionId) lastAudioSequence = 0;
-    if (previouslyOwnedOverlay && !audioOwnsOverlay()) {
+    if (!previouslyOwnedOverlay && ownsOverlayNow) {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = null;
+      cancelActiveTranslation();
+      translateSeq += 1;
+      lastText = '';
+      lastTranslatedText = '';
+      audioRendered = false;
+      updateOverlay('', '');
+    }
+    if (previouslyOwnedOverlay && !ownsOverlayNow) {
       clearAudioSubtitle();
       window.setTimeout(handleCaptionChange, 0);
     }
@@ -2501,7 +2512,10 @@
         createFloatingButton();
         mountExtensionElements();
         handleCaptionChange();
-      } else if (Date.now() - Math.max(captionDetectionStartedAt, lastNativeCaptionAt) >= NATIVE_CAPTION_MISSING_MS) {
+      }
+      const hasNativeCaptionText = Boolean(caption?.el?.textContent?.trim());
+      if (!hasNativeCaptionText
+        && Date.now() - Math.max(captionDetectionStartedAt, lastNativeCaptionAt) >= NATIVE_CAPTION_MISSING_MS) {
         reportNativeCaptionStatus(false);
       }
     }, POLL_MS);
