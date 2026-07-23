@@ -7,6 +7,9 @@ const root = path.resolve(__dirname, '..');
 
 async function installChromeMock(page) {
   await page.addInitScript(() => {
+    const runtimeListeners = [];
+    const permissionRequests = [];
+    const runtimeMessages = [];
     const store = {
       pansubEnabled: true,
       pansubSettings: {
@@ -14,12 +17,19 @@ async function installChromeMock(page) {
         interfaceLanguage: 'en',
         targetLanguage: 'zh-CN',
         displayMode: 'bilingual',
-        subtitlePosition: 'auto'
+        subtitlePosition: 'auto',
+        subtitleSource: 'auto',
+        audioSourceLanguage: 'en-US',
+        audioDisclosureAccepted: false,
+        audioGoogleFallbackConsent: false
       }
     };
 
     window.__pansubStore = store;
     window.__pansubOptionsOpened = 0;
+    window.__pansubPermissionRequests = permissionRequests;
+    window.__pansubRuntimeMessages = runtimeMessages;
+    window.__pansubRuntimeListeners = runtimeListeners;
     window.chrome = {
       storage: {
         local: {
@@ -34,16 +44,65 @@ async function installChromeMock(page) {
           }
         }
       },
+      permissions: {
+        request(options, callback) {
+          permissionRequests.push(options);
+          callback?.(true);
+          return Promise.resolve(true);
+        }
+      },
       runtime: {
         lastError: null,
+        onMessage: {
+          addListener(listener) {
+            runtimeListeners.push(listener);
+          }
+        },
         openOptionsPage(callback) {
           window.__pansubOptionsOpened += 1;
           callback?.();
         },
-        sendMessage() {}
+        sendMessage(message, callback) {
+          runtimeMessages.push(message);
+          const response = message.type === 'PANSUB_AUDIO_GET_STATE'
+            ? {
+                ok: true,
+                state: {
+                  phase: 'available',
+                  sessionId: null,
+                  tabId: 12,
+                  source: 'auto',
+                  error: null,
+                  detail: null,
+                  updatedAt: 1
+                }
+              }
+            : message.type === 'PANSUB_AUDIO_START'
+              ? {
+                  ok: true,
+                  state: {
+                    phase: 'preparing',
+                    sessionId: 'session-1',
+                    tabId: 12,
+                    source: 'audio',
+                    error: null,
+                    detail: null,
+                    updatedAt: 2
+                  }
+                }
+              : { ok: true };
+          callback?.(response);
+          return Promise.resolve(response);
+        }
       }
     };
   });
+}
+
+async function dispatchRuntimeMessage(page, message) {
+  await page.evaluate((payload) => {
+    for (const listener of window.__pansubRuntimeListeners) listener(payload, {}, () => {});
+  }, message);
 }
 
 async function main() {
@@ -52,6 +111,59 @@ async function main() {
   await installChromeMock(page);
   await page.goto(pathToFileURL(path.join(root, 'popup.html')).toString());
   await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'PanSub is enabled');
+
+  assert.strictEqual(await page.locator('#audioStart').isVisible(), true);
+  await page.click('#audioStart');
+  assert.strictEqual(await page.locator('#audioDisclosure').isVisible(), true);
+  await page.check('#audioDisclosureAccepted');
+  await page.click('#audioConfirmStart');
+  await page.waitForFunction(() => window.__pansubRuntimeMessages.some((message) => message.type === 'PANSUB_AUDIO_START'));
+  const permissionRequests = await page.evaluate(() => window.__pansubPermissionRequests);
+  assert.strictEqual(permissionRequests[0].permissions[0], 'tabCapture');
+  assert.strictEqual(await page.evaluate(() => window.__pansubStore.pansubSettings.audioDisclosureAccepted), true);
+
+  await dispatchRuntimeMessage(page, {
+    type: 'PANSUB_AUDIO_STATE_CHANGED',
+    state: {
+      phase: 'listening',
+      sessionId: 'session-1',
+      tabId: 12,
+      source: 'audio',
+      error: null,
+      detail: null,
+      updatedAt: 3
+    }
+  });
+  assert.strictEqual(await page.locator('#audioStop').isVisible(), true);
+  await page.click('#audioStop');
+  await page.waitForFunction(() => window.__pansubRuntimeMessages.some((message) => message.type === 'PANSUB_AUDIO_STOP'));
+
+  await dispatchRuntimeMessage(page, {
+    type: 'PANSUB_AUDIO_STATE_CHANGED',
+    state: {
+      phase: 'error',
+      sessionId: 'session-2',
+      tabId: 12,
+      source: 'audio',
+      error: 'GOOGLE_CONSENT_REQUIRED',
+      detail: null,
+      updatedAt: 4
+    }
+  });
+  assert.strictEqual(await page.locator('#audioGoogleFallback').isVisible(), true);
+
+  await dispatchRuntimeMessage(page, {
+    type: 'PANSUB_AUDIO_STATE_CHANGED',
+    state: {
+      phase: 'available',
+      sessionId: null,
+      tabId: 12,
+      source: 'auto',
+      error: null,
+      detail: null,
+      updatedAt: 5
+    }
+  });
 
   await page.selectOption('#interfaceLanguage', 'zh-CN');
   await page.waitForFunction(() => document.querySelector('#status')?.textContent === 'PanSub 已启用');

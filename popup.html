@@ -26,6 +26,52 @@
     <div class="signal-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
   </section>
 
+  <section class="audio-mode" aria-labelledby="audioModeTitle">
+    <div class="section-heading">
+      <div>
+        <strong id="audioModeTitle" data-i18n="audioMode">Audio Mode</strong>
+        <small data-i18n="audioModeBeta">LOCAL BETA</small>
+      </div>
+      <span id="audioStateBadge" class="audio-state-badge" data-i18n="audioAvailable">Available</span>
+    </div>
+
+    <fieldset class="source-segment" aria-label="Subtitle source" data-i18n-aria="subtitleSource">
+      <label><input type="radio" name="subtitleSource" value="auto"><span data-i18n="sourceAuto">Auto</span></label>
+      <label><input type="radio" name="subtitleSource" value="native"><span data-i18n="sourceNative">Captions</span></label>
+      <label><input type="radio" name="subtitleSource" value="audio"><span data-i18n="sourceAudio">Tab audio</span></label>
+    </fieldset>
+
+    <div class="audio-summary" aria-live="polite">
+      <span class="audio-summary-icon" aria-hidden="true">A</span>
+      <div><strong id="audioStatus" data-i18n="audioNoCaptions">No native captions detected</strong><small id="audioDetail" data-i18n="audioReadyDetail">Start only when you want PanSub to listen.</small></div>
+    </div>
+
+    <div class="audio-actions">
+      <button id="audioStart" type="button" class="primary-command"><span aria-hidden="true">▶</span><span data-i18n="audioStart">Start listening</span></button>
+      <button id="audioStop" type="button" class="danger-command" hidden><span aria-hidden="true">■</span><span data-i18n="audioStop">Stop listening</span></button>
+    </div>
+
+    <div id="audioDisclosure" class="audio-disclosure" hidden>
+      <strong data-i18n="audioDisclosureTitle">Before Audio Mode starts</strong>
+      <p data-i18n="audioDisclosureBody">PanSub captures only this tab. Chrome recognizes English locally. Audio and transcripts are not saved.</p>
+      <label class="consent-row"><input id="audioDisclosureAccepted" type="checkbox"><span data-i18n="audioDisclosureAccept">I understand and want to continue</span></label>
+      <div class="disclosure-actions">
+        <button id="audioCancelStart" type="button" class="quiet-command" data-i18n="cancel">Cancel</button>
+        <button id="audioConfirmStart" type="button" class="primary-command" disabled data-i18n="continue">Continue</button>
+      </div>
+    </div>
+
+    <div id="audioGoogleFallback" class="audio-disclosure" hidden>
+      <strong data-i18n="googleFallbackTitle">Local translation is unavailable</strong>
+      <p data-i18n="googleFallbackBody">Audio stays on this device, but recognized text must be sent to Google Translate to show translated subtitles.</p>
+      <label class="consent-row"><input id="audioGoogleFallbackAccepted" type="checkbox"><span data-i18n="googleFallbackAccept">Allow this text-only fallback</span></label>
+      <div class="disclosure-actions">
+        <button id="audioDeclineFallback" type="button" class="quiet-command" data-i18n="decline">Decline</button>
+        <button id="audioConfirmFallback" type="button" class="primary-command" disabled data-i18n="allowRetry">Allow and retry</button>
+      </div>
+    </div>
+  </section>
+
   <main class="controls">
     <label class="toggle-row" for="enabled">
       <span><strong data-i18n="showSubtitles">Show subtitles</strong><small data-i18n="showSubtitlesHelp">Enable the live translation layer</small></span>
@@ -44,6 +90,7 @@
   <footer><span class="footer-dot"></span><span data-i18n="autoSync">Changes sync instantly</span><kbd>MV3</kbd></footer>
 
   <script src="settings.js"></script>
+  <script src="audio-mode-protocol.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
