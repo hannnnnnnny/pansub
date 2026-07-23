@@ -24,8 +24,19 @@
   const FLOATING_REGULAR_SIZE = 44;
   const FLOATING_SMALL_SIZE = 34;
   const FLOATING_MARGIN = 8;
+  const NATIVE_CAPTION_MISSING_MS = 5000;
   const GLOSSARY = window.PANSUB_GLOSSARY || { version: 'none', terms: [] };
   const DEFAULT_SETTINGS = window.PANSUB_DEFAULT_SETTINGS;
+  const AUDIO_PROTOCOL = window.PANSUB_AUDIO_PROTOCOL;
+  const AUDIO_STATE_API = window.PANSUB_AUDIO_STATE;
+  const AUDIO_MESSAGES = AUDIO_PROTOCOL?.messages || {
+    GET_STATE: 'PANSUB_AUDIO_GET_STATE',
+    STATE_CHANGED: 'PANSUB_AUDIO_STATE_CHANGED',
+    SUBTITLE: 'PANSUB_AUDIO_SUBTITLE',
+    STOP: 'PANSUB_AUDIO_STOP',
+    NATIVE_CAPTION_STATUS: 'PANSUB_NATIVE_CAPTION_STATUS',
+    OPEN_AUDIO_POPUP: 'PANSUB_OPEN_AUDIO_POPUP'
+  };
 
   const translationCache = new Map();
   let settings = { ...DEFAULT_SETTINGS };
@@ -54,9 +65,42 @@
   let lastStablePlayerRect = null;
   let captionObserver = null;
   let observedCaptionEl = null;
+  let audioState = AUDIO_STATE_API?.createAudioState?.() || {
+    phase: 'idle',
+    sessionId: null,
+    tabId: null,
+    source: 'auto',
+    error: null,
+    detail: null,
+    updatedAt: 0
+  };
+  let lastAudioSequence = 0;
+  let audioRendered = false;
+  let captionDetectionStartedAt = Date.now();
+  let lastNativeCaptionAt = 0;
+  let lastReportedNativeStatus = null;
+  let lastNativeStatusReportAt = 0;
 
   function debug(...args) {
     if (settings.debugLogs) console.log(...args);
+  }
+
+  function audioOwnsOverlay() {
+    return audioState.source === 'audio'
+      && Boolean(audioState.sessionId)
+      && !['idle', 'native', 'available'].includes(audioState.phase);
+  }
+
+  function reportNativeCaptionStatus(hasCaptions) {
+    const now = Date.now();
+    if (lastReportedNativeStatus === hasCaptions && now - lastNativeStatusReportAt < 5000) return;
+    lastReportedNativeStatus = hasCaptions;
+    lastNativeStatusReportAt = now;
+    chrome.runtime.sendMessage({
+      type: AUDIO_MESSAGES.NATIVE_CAPTION_STATUS,
+      hasCaptions,
+      observedAt: now
+    });
   }
 
   function clamp(value, min, max) {
@@ -523,7 +567,21 @@
       resetPosition: 'Reset position',
       buttonControlsNote: 'Hidden buttons can be restored from the PanSub settings page.',
       lockSubtitleBox: 'Lock subtitle box',
-      unlockSubtitleBox: 'Unlock subtitle box'
+      unlockSubtitleBox: 'Unlock subtitle box',
+      audioAvailable: 'No native captions detected',
+      audioAvailableDetail: 'Audio Mode can listen to this tab after you start it.',
+      audioPreparing: 'Preparing local recognition',
+      audioPreparingDetail: 'Chrome is checking the on-device English language pack.',
+      audioListening: 'Listening to tab audio',
+      audioListeningDetail: 'Speech recognition runs locally on this device.',
+      audioDegraded: 'Recognition is recovering',
+      audioDegradedDetail: 'PanSub is restarting the local recognizer.',
+      audioError: 'Audio Mode needs attention',
+      audioErrorDetail: 'Open PanSub to review the error and retry.',
+      audioStopping: 'Stopping Audio Mode',
+      audioStoppingDetail: 'Releasing the captured tab audio.',
+      openAudioMode: 'Open Audio Mode',
+      stopAudioMode: 'Stop listening'
     },
     'zh-CN': {
       title: 'PanSub',
@@ -552,7 +610,21 @@
       resetPosition: '重置位置',
       buttonControlsNote: '隐藏后的悬浮球可以在 PanSub 设置页恢复。',
       lockSubtitleBox: '锁定字幕框',
-      unlockSubtitleBox: '解锁字幕框'
+      unlockSubtitleBox: '解锁字幕框',
+      audioAvailable: '未检测到原生字幕',
+      audioAvailableDetail: '你可以从插件弹窗手动启动音频模式。',
+      audioPreparing: '正在准备本地识别',
+      audioPreparingDetail: 'Chrome 正在检查设备上的英语语言包。',
+      audioListening: '正在识别标签页音频',
+      audioListeningDetail: '语音识别只在此设备本地运行。',
+      audioDegraded: '识别正在恢复',
+      audioDegradedDetail: 'PanSub 正在重新启动本地识别器。',
+      audioError: '音频模式需要处理',
+      audioErrorDetail: '打开 PanSub 查看错误并重试。',
+      audioStopping: '正在停止音频模式',
+      audioStoppingDetail: '正在释放标签页音频。',
+      openAudioMode: '打开音频模式',
+      stopAudioMode: '停止识别'
     }
   };
 
@@ -805,6 +877,32 @@
     status.dataset.pansubText = 'status';
     header.append(title, status);
 
+    const audioSection = document.createElement('div');
+    audioSection.dataset.pansubPart = 'audio';
+    const audioStatus = document.createElement('strong');
+    audioStatus.dataset.pansubAudio = 'status';
+    const audioDetail = document.createElement('small');
+    audioDetail.dataset.pansubAudio = 'detail';
+    const audioStart = document.createElement('button');
+    audioStart.type = 'button';
+    audioStart.dataset.pansubAction = 'audioMode';
+    audioStart.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      chrome.runtime.sendMessage({ type: AUDIO_MESSAGES.OPEN_AUDIO_POPUP });
+      toggleFloatingPanel(false);
+    });
+    const audioStop = document.createElement('button');
+    audioStop.type = 'button';
+    audioStop.dataset.pansubAction = 'audioStop';
+    audioStop.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      chrome.runtime.sendMessage({ type: AUDIO_MESSAGES.STOP });
+      toggleFloatingPanel(false);
+    });
+    audioSection.append(audioStatus, audioDetail, audioStart, audioStop);
+
     const enabledRow = createFloatingSwitch('enabled', 'showSubtitles');
     const modeRow = createFloatingSelect('displayMode', 'mode', [
       ['bilingual', 'bilingual'],
@@ -844,7 +942,7 @@
     actions.dataset.pansubPart = 'actions';
     actions.append(floatingSettingsButton, settingsButton);
 
-    floatingPanelEl.append(header, enabledRow, modeRow, targetRow, actions);
+    floatingPanelEl.append(header, audioSection, enabledRow, modeRow, targetRow, actions);
     markTreeNoTranslate(floatingPanelEl);
     extensionHost().appendChild(floatingPanelEl);
     bindFloatingPanelControls();
@@ -1182,6 +1280,7 @@
 
   function applyFloatingButtonStyle() {
     if (!floatingEl) return;
+    floatingEl.dataset.audioState = audioState.phase;
     const visible = isFloatingButtonVisible();
     const alpha = clamp(settings.floatingButtonOpacity, 20, 100) / 100;
     const position = floatingPosition();
@@ -1219,6 +1318,16 @@
       mark.style.cssText = 'display:grid;place-items:center;width:100%;height:100%;pointer-events:none;';
     }
     if (signal) {
+      const signalColors = {
+        available: '#f59e0b',
+        permission: '#60a5fa',
+        preparing: '#60a5fa',
+        listening: '#34d399',
+        degraded: '#f59e0b',
+        stopping: '#94a3b8',
+        error: '#fb7185'
+      };
+      const signalColor = signalColors[audioState.phase] || (settings.enabled ? '#6ee7c8' : '#94a3b8');
       signal.style.cssText = [
         'position:absolute',
         'right:2px',
@@ -1227,10 +1336,20 @@
         `height:${settings.floatingButtonSmall ? 6 : 7}px`,
         'border:2px solid rgba(8,18,17,.88)',
         'border-radius:50%',
-        `background:${settings.enabled ? '#6ee7c8' : '#94a3b8'}`,
+        `background:${signalColor}`,
         settings.enabled ? 'box-shadow:0 0 0 3px rgba(110,231,200,.1),0 0 10px rgba(110,231,200,.6)' : 'box-shadow:none',
         'pointer-events:none'
       ].join(';');
+      signal.getAnimations?.().forEach((animation) => animation.cancel());
+      if (audioState.phase === 'listening'
+        && signal.animate
+        && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        signal.animate([
+          { transform: 'scale(.82)', opacity: .7 },
+          { transform: 'scale(1.18)', opacity: 1 },
+          { transform: 'scale(.82)', opacity: .7 }
+        ], { duration: 1100, iterations: Infinity, easing: 'ease-in-out' });
+      }
     }
 
     floatingEl.onmouseenter = () => {
@@ -1319,6 +1438,23 @@
         fontSize: '12px',
         fontWeight: '700'
       });
+    });
+    floatingPanelEl.querySelectorAll('[data-pansub-part="audio"]').forEach((el) => {
+      setStyles(el, {
+        display: 'none',
+        gap: '5px',
+        margin: '0 0 8px',
+        padding: '10px',
+        border: '1px solid rgba(245,158,11,.24)',
+        borderRadius: '7px',
+        background: 'rgba(245,158,11,.08)'
+      });
+    });
+    floatingPanelEl.querySelectorAll('[data-pansub-audio="status"]').forEach((el) => {
+      setStyles(el, { color: '#f8fafc', fontSize: '13px' });
+    });
+    floatingPanelEl.querySelectorAll('[data-pansub-audio="detail"]').forEach((el) => {
+      setStyles(el, { color: '#b8c7c2', fontSize: '12px', lineHeight: '1.4' });
     });
     floatingPanelEl.querySelectorAll('[data-pansub-part="row"]').forEach((el) => {
       setStyles(el, {
@@ -1527,6 +1663,11 @@
     const targetLanguage = floatingPanelEl.querySelector('[data-pansub-control="targetLanguage"]');
     const settingsButton = floatingPanelEl.querySelector('[data-pansub-action="settings"]');
     const floatingSettingsButton = floatingPanelEl.querySelector('[data-pansub-action="floatingSettings"]');
+    const audioSection = floatingPanelEl.querySelector('[data-pansub-part="audio"]');
+    const audioStatus = floatingPanelEl.querySelector('[data-pansub-audio="status"]');
+    const audioDetail = floatingPanelEl.querySelector('[data-pansub-audio="detail"]');
+    const audioStart = floatingPanelEl.querySelector('[data-pansub-action="audioMode"]');
+    const audioStop = floatingPanelEl.querySelector('[data-pansub-action="audioStop"]');
 
     if (title) title.textContent = quickCopy('title');
     if (status) status.textContent = quickCopy(settings.enabled ? 'enabled' : 'disabled');
@@ -1535,6 +1676,29 @@
     if (targetLanguage) targetLanguage.value = settings.targetLanguage;
     if (settingsButton) settingsButton.textContent = quickCopy('settings');
     if (floatingSettingsButton) floatingSettingsButton.textContent = quickCopy('floatingSettings');
+    const phaseCopy = {
+      available: ['audioAvailable', 'audioAvailableDetail'],
+      permission: ['audioPreparing', 'audioPreparingDetail'],
+      preparing: ['audioPreparing', 'audioPreparingDetail'],
+      listening: ['audioListening', 'audioListeningDetail'],
+      degraded: ['audioDegraded', 'audioDegradedDetail'],
+      error: ['audioError', 'audioErrorDetail'],
+      stopping: ['audioStopping', 'audioStoppingDetail']
+    };
+    const audioCopy = phaseCopy[audioState.phase];
+    if (audioSection) audioSection.style.display = audioCopy ? 'grid' : 'none';
+    if (audioStatus && audioCopy) audioStatus.textContent = quickCopy(audioCopy[0]);
+    if (audioDetail && audioCopy) audioDetail.textContent = quickCopy(audioCopy[1]);
+    if (audioStart) {
+      audioStart.textContent = quickCopy('openAudioMode');
+      audioStart.style.display = ['available', 'error'].includes(audioState.phase) ? 'block' : 'none';
+    }
+    if (audioStop) {
+      audioStop.textContent = quickCopy('stopAudioMode');
+      audioStop.style.display = ['permission', 'preparing', 'listening', 'degraded', 'stopping'].includes(audioState.phase)
+        ? 'block'
+        : 'none';
+    }
     if (floatingEl) {
       floatingEl.title = quickCopy('quickControls');
       floatingEl.setAttribute('aria-label', floatingEl.title);
@@ -2183,6 +2347,54 @@
     return '';
   }
 
+  function clearAudioSubtitle() {
+    if (!audioRendered) return;
+    audioRendered = false;
+    lastAudioSequence = 0;
+    lastText = '';
+    updateOverlay('', '');
+  }
+
+  function applyAudioState(nextState) {
+    if (!nextState || (AUDIO_PROTOCOL?.isAudioState && !AUDIO_PROTOCOL.isAudioState(nextState))) return;
+    const previousSessionId = audioState.sessionId;
+    const previouslyOwnedOverlay = audioOwnsOverlay();
+    audioState = nextState;
+    if (audioState.sessionId !== previousSessionId) lastAudioSequence = 0;
+    if (previouslyOwnedOverlay && !audioOwnsOverlay()) {
+      clearAudioSubtitle();
+      window.setTimeout(handleCaptionChange, 0);
+    }
+    createFloatingButton();
+    applyFloatingButtonStyle();
+    updateFloatingPanel();
+  }
+
+  function applyAudioSubtitle(message) {
+    if (!settings.enabled || !audioOwnsOverlay()) return;
+    if (message.sessionId !== audioState.sessionId) return;
+    if (!Number.isInteger(message.sequence) || message.sequence <= lastAudioSequence) return;
+    const text = String(message.text || '').trim();
+    if (!text) return;
+    lastAudioSequence = message.sequence;
+    audioRendered = true;
+    cancelActiveTranslation();
+    translateSeq += 1;
+    updateOverlay('', text);
+  }
+
+  function handleAudioRuntimeMessage(message) {
+    if (message?.type === AUDIO_MESSAGES.STATE_CHANGED) {
+      applyAudioState(message.state);
+      return false;
+    }
+    if (message?.type === AUDIO_MESSAGES.SUBTITLE) {
+      applyAudioSubtitle(message);
+      return false;
+    }
+    return false;
+  }
+
   function applyNativeCaptionVisibility(caption) {
     if (nativeCaptionEl && nativeCaptionEl !== caption?.el) {
       nativeCaptionEl.style.removeProperty('opacity');
@@ -2207,6 +2419,13 @@
     applyNativeCaptionVisibility(caption);
     applyOverlayPosition(caption);
 
+    const text = caption.el.textContent.trim();
+    if (text) {
+      lastNativeCaptionAt = Date.now();
+      reportNativeCaptionStatus(true);
+    }
+    if (audioOwnsOverlay()) return;
+
     if (!settings.enabled) {
       if (debounceTimer) clearTimeout(debounceTimer);
       cancelActiveTranslation();
@@ -2217,7 +2436,6 @@
       return;
     }
 
-    const text = caption.el.textContent.trim();
     if (!text || text === lastText) return;
     lastText = text;
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -2283,9 +2501,13 @@
         createFloatingButton();
         mountExtensionElements();
         handleCaptionChange();
+      } else if (Date.now() - Math.max(captionDetectionStartedAt, lastNativeCaptionAt) >= NATIVE_CAPTION_MISSING_MS) {
+        reportNativeCaptionStatus(false);
       }
     }, POLL_MS);
   }
+
+  chrome.runtime.onMessage?.addListener(handleAudioRuntimeMessage);
 
   chrome.storage.local.get(['pansubEnabled', SETTINGS_KEY, CACHE_KEY], (result) => {
     mergeSettings(result[SETTINGS_KEY], result.pansubEnabled);
@@ -2299,6 +2521,10 @@
     attachFullscreenListeners();
     mountExtensionElements();
     waitForCaption();
+    chrome.runtime.sendMessage({ type: AUDIO_MESSAGES.GET_STATE }, (response) => {
+      if (chrome.runtime?.lastError) return;
+      if (response?.state) applyAudioState(response.state);
+    });
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
