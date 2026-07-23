@@ -121,6 +121,18 @@ const I18N = {
     localCache: 'Local translation cache',
     localCacheHelp: 'Reuse translated lines during the same course recording.',
     clearTranslationCache: 'Clear translation cache',
+    audioSettingsTitle: 'Audio recognition',
+    audioSettingsDescription: 'Used only when you explicitly start Audio Mode from the popup.',
+    audioSourceLanguage: 'Spoken English',
+    audioSourceLanguageHelp: "Choose the lecturer's closest accent for better recognition.",
+    audioEnglishUS: 'English (United States)',
+    audioEnglishGB: 'English (United Kingdom)',
+    audioEnglishAU: 'English (Australia)',
+    audioEnglishNZ: 'English (New Zealand)',
+    audioEnglishCA: 'English (Canada)',
+    audioPrivacyTitle: 'Local by default',
+    audioPrivacyDescription: 'Chrome recognizes tab audio on this device. PanSub does not save audio or transcripts. Google receives recognized text only after separate consent.',
+    resetAudioConsent: 'Revoke Audio Mode permissions',
     quickButtonTitle: 'Quick Controls',
     quickButtonDescription: 'Add a draggable page-side panel for subtitle mode, language, hiding, and settings while watching.',
     samplePage: 'Panopto lecture recording',
@@ -231,6 +243,18 @@ const I18N = {
     localCache: '本地翻译缓存',
     localCacheHelp: '重复字幕会复用缓存，减少同一录像中的重复请求。',
     clearTranslationCache: '清空翻译缓存',
+    audioSettingsTitle: '音频识别',
+    audioSettingsDescription: '只有你从弹窗主动启动音频模式后才会使用。',
+    audioSourceLanguage: '英语口音',
+    audioSourceLanguageHelp: '选择最接近讲师口音的语言，提高识别准确率。',
+    audioEnglishUS: '英语（美国）',
+    audioEnglishGB: '英语（英国）',
+    audioEnglishAU: '英语（澳大利亚）',
+    audioEnglishNZ: '英语（新西兰）',
+    audioEnglishCA: '英语（加拿大）',
+    audioPrivacyTitle: '默认在本地处理',
+    audioPrivacyDescription: 'Chrome 在本设备识别标签页音频。PanSub 不保存音频或转录；只有你另行同意后，识别文字才会发送给 Google。',
+    resetAudioConsent: '撤销音频模式授权',
     quickButtonTitle: '快捷控制',
     quickButtonDescription: '在页面侧边显示一个可拖动小面板，观看时快速调整字幕模式、语言、隐藏和设置。',
     samplePage: 'Panopto 课程录像',
@@ -278,6 +302,7 @@ const controls = {
   hideNativeCaptions: document.getElementById('hideNativeCaptions'),
   glossaryEnabled: document.getElementById('glossaryEnabled'),
   cacheEnabled: document.getElementById('cacheEnabled'),
+  audioSourceLanguage: document.getElementById('audioSourceLanguage'),
   debugLogs: document.getElementById('debugLogs'),
   floatingButtonEnabled: document.getElementById('floatingButtonEnabled'),
   floatingButtonSide: document.getElementById('floatingButtonSide'),
@@ -612,6 +637,25 @@ document.getElementById('clearDisabledSites').addEventListener('click', () => {
 
 document.getElementById('clearTranslationCache').addEventListener('click', () => {
   removeFromStorage(CACHE_KEY);
+});
+
+document.getElementById('resetAudioConsent').addEventListener('click', () => {
+  settings = {
+    ...settings,
+    subtitleSource: 'auto',
+    audioDisclosureAccepted: false,
+    audioGoogleFallbackConsent: false
+  };
+  render();
+  saveToStorage({
+    [SETTINGS_KEY]: settings,
+    pansubEnabled: settings.enabled
+  });
+  try {
+    chrome.runtime?.sendMessage?.({ type: 'PANSUB_AUDIO_STOP' }, () => void chrome.runtime.lastError);
+  } catch (_) {
+    // Settings remain revoked even when no Audio Mode session is running.
+  }
 });
 
 const commandPalette = document.getElementById('commandPalette');

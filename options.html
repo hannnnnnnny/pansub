@@ -184,7 +184,7 @@
         </div>
       </section>
 
-      <section id="translation" class="group" data-search-key="translation target language provider academic glossary cache">
+      <section id="translation" class="group" data-search-key="translation target language provider academic glossary cache audio speech recognition consent privacy">
         <div class="group-title"><span class="section-index">03 / ENGINE</span><div><h3 data-i18n="translationTitle">Translation</h3><p data-i18n="translationDescription">Choose the target language and translation behavior.</p></div><span class="section-state section-state-neutral">AUTO</span></div>
         <div class="field-grid two-up">
           <label class="field"><span data-i18n="targetLanguage">Target language</span><select id="targetLanguage"><option value="zh-CN" data-i18n="targetChineseSimplified">Chinese Simplified</option><option value="zh-TW" data-i18n="targetChineseTraditional">Chinese Traditional</option><option value="ja" data-i18n="targetJapanese">Japanese</option><option value="ko" data-i18n="targetKorean">Korean</option><option value="en" data-i18n="targetEnglish">English</option></select></label>
@@ -193,6 +193,13 @@
         <label class="switch-row"><span><strong data-i18n="academicGlossary">Academic glossary</strong><small data-i18n="academicGlossaryHelp">Protect common academic terms across business, arts, IT, science, law, and more.</small></span><input id="glossaryEnabled" type="checkbox"></label>
         <label class="switch-row"><span><strong data-i18n="localCache">Local translation cache</strong><small data-i18n="localCacheHelp">Reuse translated lines during the same course recording.</small></span><input id="cacheEnabled" type="checkbox"></label>
         <button id="clearTranslationCache" type="button" class="secondary-action" data-i18n="clearTranslationCache">Clear translation cache</button>
+        <div class="subsection-heading">
+          <span class="section-index">AUDIO MODE / BETA</span>
+          <div><h4 data-i18n="audioSettingsTitle">Audio recognition</h4><p data-i18n="audioSettingsDescription">Used only when you explicitly start Audio Mode from the popup.</p></div>
+        </div>
+        <label class="field"><span data-i18n="audioSourceLanguage">Spoken English</span><select id="audioSourceLanguage"><option value="en-US" data-i18n="audioEnglishUS">English (United States)</option><option value="en-GB" data-i18n="audioEnglishGB">English (United Kingdom)</option><option value="en-AU" data-i18n="audioEnglishAU">English (Australia)</option><option value="en-NZ" data-i18n="audioEnglishNZ">English (New Zealand)</option><option value="en-CA" data-i18n="audioEnglishCA">English (Canada)</option></select><small data-i18n="audioSourceLanguageHelp">Choose the lecturer's closest accent for better recognition.</small></label>
+        <div class="privacy-note"><strong data-i18n="audioPrivacyTitle">Local by default</strong><p data-i18n="audioPrivacyDescription">Chrome recognizes tab audio on this device. PanSub does not save audio or transcripts. Google receives recognized text only after separate consent.</p></div>
+        <button id="resetAudioConsent" type="button" class="secondary-action danger-secondary" data-i18n="resetAudioConsent">Revoke Audio Mode permissions</button>
       </section>
 
       <section id="floating" class="group" data-search-key="quick floating button compact opacity side hidden site">

@@ -55,6 +55,8 @@ It watches the visible English captions rendered by the Panopto player, translat
 
 Features:
 - Real-time bilingual subtitles for Canvas / Panopto recordings
+- Audio Mode Beta for recordings without captions, using Chrome on-device English speech recognition
+- Spoken-English choices for US, UK, Australia, New Zealand, and Canada
 - Built-in academic glossary for business, arts, IT, science, law, and more
 - Interface language switch for English or Chinese settings UI
 - Searchable settings command panel and live subtitle style preview
@@ -72,9 +74,9 @@ Features:
 - Debug logs for checking which Panopto caption element was detected
 
 Privacy note:
-PanSub sends the current caption text to the Google Translate endpoint for translation. Settings and translation cache are stored locally with chrome.storage.local. PanSub does not include analytics, ads, tracking pixels, or an author-owned remote server.
+Native-caption mode sends current caption text to Google Translate. Audio Mode starts only after an explicit user click; Chrome recognizes English locally and PanSub does not save audio or transcripts. Audio Mode prefers Chrome's local Translator. If it is unavailable, recognized text is sent to Google Translate only after separate consent. Settings, consent choices, and translation cache are stored locally with chrome.storage.local. PanSub does not include analytics, ads, tracking pixels, or an author-owned remote server.
 
-PanSub requires captions to be enabled in the Panopto player.
+PanSub requires Chrome 139 or later. Native captions remain the preferred source; Audio Mode Beta is available for recordings without captions.
 ```
 
 ## Privacy Tab
@@ -82,13 +84,31 @@ PanSub requires captions to be enabled in the Panopto player.
 Single purpose:
 
 ```text
-PanSub translates visible Panopto lecture captions and displays them as a subtitle overlay for the current recording page.
+PanSub translates visible Panopto lecture captions, or user-started on-device speech recognition results when captions are unavailable, and displays them as a subtitle overlay for the current recording page.
 ```
 
 Permission justification for `storage`:
 
 ```text
 Used to save the user's PanSub settings, enabled state, and local translation cache on the device.
+```
+
+Permission justification for `activeTab`:
+
+```text
+Used after a direct user action to identify the active Panopto recording tab where Audio Mode should start.
+```
+
+Permission justification for `offscreen`:
+
+```text
+Used to maintain the user-started tab audio stream and Chrome on-device speech recognition after the popup closes. No offscreen UI, audio storage, analytics, or tracking is used.
+```
+
+Optional permission justification for `tabCapture`:
+
+```text
+Requested only when the user clicks Start listening. It captures audio only from that active Panopto tab for Chrome on-device speech recognition and is released when Audio Mode stops.
 ```
 
 Host permission justification:
@@ -100,13 +120,13 @@ Used only on matching Panopto pages to read visible caption text rendered by the
 User data handling:
 
 ```text
-PanSub reads visible caption text on Panopto recording pages. The current caption text is sent to Google Translate for translation. PanSub does not sell user data, does not use data for advertising, does not use data for creditworthiness or lending, and does not transfer data to an author-owned remote server.
+PanSub reads visible caption text on Panopto recording pages. Native caption text is sent to Google Translate for translation. Audio Mode captures only a user-selected tab and Chrome recognizes speech locally; PanSub does not save or transmit audio or transcript history. Recognized text is sent to Google Translate only if local translation is unavailable and the user separately consents. PanSub does not sell user data, use it for advertising, creditworthiness, or lending, or transfer it to an author-owned remote server.
 ```
 
 Data types to disclose:
 
 ```text
-Website content: visible Panopto caption text used for translation.
+Website content: visible Panopto caption text, or recognized text explicitly allowed for Google fallback, used only for translation. Tab audio is processed locally and is not saved or transmitted.
 ```
 
 ## Distribution
@@ -213,6 +233,8 @@ It watches the visible English captions rendered by the Panopto player, translat
 
 Features:
 - Real-time bilingual subtitles for Canvas / Panopto recordings
+- Audio Mode Beta for recordings without captions, using Chrome on-device English speech recognition
+- Spoken-English choices for US, UK, Australia, New Zealand, and Canada
 - Built-in academic glossary for business, arts, IT, science, law, and more
 - Interface language switch for English or Chinese settings UI
 - Searchable settings command panel and live subtitle style preview
@@ -230,9 +252,9 @@ Features:
 - Debug logs for checking which Panopto caption element was detected
 
 Privacy note:
-PanSub sends the current caption text to the Google Translate endpoint for translation. Settings and translation cache are stored locally with chrome.storage.local. PanSub does not include analytics, ads, tracking pixels, or an author-owned remote server.
+Native-caption mode sends current caption text to Google Translate. Audio Mode starts only after an explicit user click; Chrome recognizes English locally and PanSub does not save audio or transcripts. Audio Mode prefers Chrome's local Translator. If it is unavailable, recognized text is sent to Google Translate only after separate consent. Settings, consent choices, and translation cache are stored locally with chrome.storage.local. PanSub does not include analytics, ads, tracking pixels, or an author-owned remote server.
 
-PanSub requires captions to be enabled in the Panopto player.
+PanSub requires Chrome 139 or later. Native captions remain the preferred source; Audio Mode Beta is available for recordings without captions.
 ```
 
 ## Privacy 标签页
@@ -240,13 +262,31 @@ PanSub requires captions to be enabled in the Panopto player.
 Single purpose：
 
 ```text
-PanSub translates visible Panopto lecture captions and displays them as a subtitle overlay for the current recording page.
+PanSub translates visible Panopto lecture captions, or user-started on-device speech recognition results when captions are unavailable, and displays them as a subtitle overlay for the current recording page.
 ```
 
 `storage` 权限解释：
 
 ```text
 Used to save the user's PanSub settings, enabled state, and local translation cache on the device.
+```
+
+`activeTab` 权限解释：
+
+```text
+Used after a direct user action to identify the active Panopto recording tab where Audio Mode should start.
+```
+
+`offscreen` 权限解释：
+
+```text
+Used to maintain the user-started tab audio stream and Chrome on-device speech recognition after the popup closes. No offscreen UI, audio storage, analytics, or tracking is used.
+```
+
+可选 `tabCapture` 权限解释：
+
+```text
+Requested only when the user clicks Start listening. It captures audio only from that active Panopto tab for Chrome on-device speech recognition and is released when Audio Mode stops.
 ```
 
 Panopto 域名权限解释：
@@ -258,11 +298,11 @@ Used only on matching Panopto pages to read visible caption text rendered by the
 用户数据处理说明：
 
 ```text
-PanSub reads visible caption text on Panopto recording pages. The current caption text is sent to Google Translate for translation. PanSub does not sell user data, does not use data for advertising, does not use data for creditworthiness or lending, and does not transfer data to an author-owned remote server.
+PanSub reads visible caption text on Panopto recording pages. Native caption text is sent to Google Translate for translation. Audio Mode captures only a user-selected tab and Chrome recognizes speech locally; PanSub does not save or transmit audio or transcript history. Recognized text is sent to Google Translate only if local translation is unavailable and the user separately consents. PanSub does not sell user data, use it for advertising, creditworthiness, or lending, or transfer it to an author-owned remote server.
 ```
 
 需要披露的数据类型：
 
 ```text
-Website content: visible Panopto caption text used for translation.
+Website content: visible Panopto caption text, or recognized text explicitly allowed for Google fallback, used only for translation. Tab audio is processed locally and is not saved or transmitted.
 ```

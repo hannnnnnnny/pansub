@@ -28,6 +28,10 @@ function settings(overrides = {}) {
     hideNativeCaptions: false,
     glossaryEnabled: true,
     cacheEnabled: true,
+    subtitleSource: 'auto',
+    audioSourceLanguage: 'en-US',
+    audioDisclosureAccepted: true,
+    audioGoogleFallbackConsent: true,
     debugLogs: false,
     floatingButtonEnabled: true,
     floatingButtonSide: 'right',
@@ -108,6 +112,14 @@ async function main() {
   await page.waitForFunction(() => document.title === 'PanSub 设置');
   const pageHeading = await page.locator('h2').textContent();
   assert.strictEqual(pageHeading, '课程字幕控制');
+
+  await page.selectOption('#audioSourceLanguage', 'en-NZ');
+  await page.waitForFunction(() => window.__pansubStore.pansubSettings.audioSourceLanguage === 'en-NZ');
+  await page.click('#resetAudioConsent');
+  await page.waitForFunction(() => window.__pansubStore.pansubSettings.audioDisclosureAccepted === false);
+  const audioPrivacy = await page.evaluate(() => window.__pansubStore.pansubSettings);
+  assert.strictEqual(audioPrivacy.audioGoogleFallbackConsent, false);
+  assert.strictEqual(audioPrivacy.subtitleSource, 'auto');
 
   await page.keyboard.press('Control+K');
   await page.waitForSelector('#commandPalette:not([hidden])');
