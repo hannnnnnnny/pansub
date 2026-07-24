@@ -6,6 +6,10 @@
 
 PanSub 是一个 Chrome 扩展，用来在 Canvas / Panopto 课程录像里实时叠加翻译字幕。它优先读取 Panopto 自带字幕；当录像没有字幕时，Chrome 139 及以上版本还可以通过用户主动启动的 **音频模式 Beta** 在本地识别标签页英语音频。
 
+> PanSub 仅用于你获准访问的课程内容和个人学习。请勿导出或分享课程音频、字幕或译文。机器翻译可能不准确，请以课程英文原文和讲师说明为准。
+>
+> PanSub 是独立开发的非官方浏览器扩展，与 Panopto, Inc. 及 Waipapa Taumata Rau | University of Auckland 不存在隶属、授权、赞助或官方认可关系。相关名称及商标归各自权利人所有。
+
 <p>
   <a href="https://chromewebstore.google.com/detail/chgafndhbmocpgbaellpbjckmnbkmdfe"><strong>从 Chrome 应用商店安装</strong></a>
 </p>
@@ -164,7 +168,7 @@ PanSub 是一个 Chrome 扩展，用来在 Canvas / Panopto 课程录像里实�
 - 普通字幕模式会把当前字幕文本发送到 Google Translate 接口用于翻译。
 - 音频模式只在你主动点击后捕获当前标签页音频，Chrome 在设备本地完成英语语音识别；PanSub 不保存音频或完整转录。
 - 音频模式优先使用 Chrome 本地 Translator。只有本地翻译不可用且你另行允许后，识别文字才会发送到 Google Translate。
-- 设置和翻译缓存保存在浏览器本地 `chrome.storage.local`。
+- 设置保存在浏览器本地 `chrome.storage.local`；翻译缓存只存在于当前 Panopto 页面会话中，关闭页面后自动清除。
 - PanSub 不包含广告、追踪像素、分析统计或作者自建远程服务器。
 - 完整说明见 [PRIVACY.md](PRIVACY.md)。
 
@@ -218,6 +222,10 @@ MIT
 # PanSub English Guide
 
 PanSub is a Chrome extension that adds real-time translated subtitles to Canvas / Panopto lecture recordings. It prefers native Panopto captions. For recordings without captions, Chrome 139 and later can use the user-started **Audio Mode Beta** to recognize English tab audio locally.
+
+> Use PanSub only with course content you are authorised to access and for personal study only. Do not export or share course audio, captions, or translations. Machine translations may be inaccurate; treat the original lecture content as authoritative.
+>
+> PanSub is an independent, unofficial browser extension. It is not affiliated with, authorised by, sponsored by, or endorsed by Panopto, Inc. or Waipapa Taumata Rau | University of Auckland. All related names and trademarks belong to their respective owners.
 
 <p>
   <a href="https://chromewebstore.google.com/detail/chgafndhbmocpgbaellpbjckmnbkmdfe"><strong>Install from Chrome Web Store</strong></a>
@@ -275,7 +283,7 @@ Click the PanSub icon and make sure **Show subtitles** is enabled. The default b
 | Interface language switch | Settings page supports English and Chinese |
 | Academic glossary | Built-in terms for IT, business, arts, science, law, and more |
 | Fullscreen support | Subtitles and controls move into the fullscreen Panopto player |
-| Local cache | Repeated captions can reuse local translation cache |
+| Session cache | Repeated captions are reused only while the current Panopto page remains open |
 
 ## Changelog
 
@@ -377,7 +385,7 @@ Note: after editing the code, reload the extension in `chrome://extensions`, the
 - Native-caption mode sends the current caption text to Google Translate for translation.
 - Audio Mode captures the current tab only after an explicit click. Chrome recognizes English on the device; PanSub does not save audio or a transcript history.
 - Audio Mode prefers Chrome's local Translator. Recognized text is sent to Google Translate only when local translation is unavailable and the user separately allows that fallback.
-- Settings and translation cache are stored locally with `chrome.storage.local`.
+- Settings are stored locally with `chrome.storage.local`; translated caption cache stays only in the current Panopto page session and is cleared when the page closes.
 - PanSub does not include ads, tracking pixels, analytics, or an author-owned remote server.
 - See [PRIVACY.md](PRIVACY.md) for the full privacy policy.
 

@@ -9,7 +9,11 @@ const packageLock = JSON.parse(fs.readFileSync(path.join(root, 'package-lock.jso
 const packageScript = fs.readFileSync(path.join(root, 'scripts', 'package-extension.ps1'), 'utf8');
 const popup = fs.readFileSync(path.join(root, 'popup.html'), 'utf8');
 const options = fs.readFileSync(path.join(root, 'options.html'), 'utf8');
+const optionsScript = fs.readFileSync(path.join(root, 'options.js'), 'utf8');
+const popupScript = fs.readFileSync(path.join(root, 'popup.js'), 'utf8');
 const listing = fs.readFileSync(path.join(root, 'STORE_LISTING.md'), 'utf8');
+const readme = fs.readFileSync(path.join(root, 'README.md'), 'utf8');
+const privacy = fs.readFileSync(path.join(root, 'PRIVACY.md'), 'utf8');
 
 const releaseFiles = [
   'manifest.json',
@@ -47,5 +51,11 @@ assert(Number(manifest.minimum_chrome_version) >= 139, 'Audio Mode requires Chro
 assert(manifest.permissions.includes('offscreen'), 'offscreen permission should be declared');
 assert(manifest.permissions.includes('tabCapture'), 'tabCapture permission should be declared');
 assert(manifest.optional_host_permissions.includes('https://translate.googleapis.com/*'), 'Google text fallback host should remain optional');
+assert(popupScript.includes('personal study only'), 'Audio Mode disclosure should limit use to personal study');
+assert(popupScript.includes('Do not export or share'), 'Audio Mode disclosure should prohibit exporting or sharing course content');
+assert(optionsScript.includes('Machine translations may be inaccurate'), 'settings should warn about machine translation accuracy');
+assert(readme.includes('not affiliated with, authorised by, sponsored by, or endorsed by'), 'README should include the non-affiliation notice');
+assert(listing.includes('not affiliated with, authorised by, sponsored by, or endorsed by'), 'store listing should include the non-affiliation notice');
+assert(privacy.includes('authorised personal study'), 'privacy policy should state the intended personal-study use');
 
 console.log('Release package audit passed');

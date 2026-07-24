@@ -2,6 +2,8 @@
 
 PanSub is a Chrome extension for showing translated subtitles on Panopto recording pages.
 
+PanSub is intended only for course content the user is authorised to access and for authorised personal study. Users must not use PanSub to export or share course audio, captions, or translations. PanSub is independent and is not affiliated with, authorised by, sponsored by, or endorsed by Panopto, Inc. or Waipapa Taumata Rau | University of Auckland.
+
 ## Data PanSub Reads
 
 PanSub reads the visible subtitle text rendered by the Panopto player on matching Panopto pages. It uses that text to create the translated subtitle overlay. When the user explicitly starts Audio Mode, PanSub also captures audio from that Panopto tab for on-device English speech recognition.
@@ -30,10 +32,9 @@ PanSub stores the following data locally with `chrome.storage.local`:
 
 - Extension enabled or disabled state
 - Subtitle display settings
-- Translation cache for repeated caption lines
 - Audio recognition language and Audio Mode consent choices
 
-The translation cache is stored on your device to reduce repeated translation requests. You can disable the cache in PanSub settings or clear extension data from Chrome.
+Translated caption lines are cached only in memory while the current Panopto page remains open. They are not written to `chrome.storage.local`, and the cache disappears when the page closes. PanSub removes persistent caption caches created by older versions.
 
 ## Analytics and Tracking
 
@@ -43,7 +44,7 @@ PanSub does not include analytics, advertising, tracking pixels, or a remote acc
 
 PanSub requests:
 
-- `storage`, used for settings and local translation cache
+- `storage`, used for settings, enabled state, and consent choices
 - `activeTab`, used to identify the Panopto tab where the user starts Audio Mode
 - `offscreen`, used to keep the user-started tab audio stream and on-device recognition alive while the popup is closed
 - `tabCapture`, used only after the user starts Audio Mode and only for that active tab's audio
@@ -63,6 +64,8 @@ https://github.com/hannnnnnnny/pansub
 # PanSub 隐私政策
 
 PanSub 是一个 Chrome 扩展，用于在 Panopto 课程录像页面上显示翻译字幕。
+
+PanSub 仅用于用户获准访问的课程内容和个人学习。用户不得使用 PanSub 导出或分享课程音频、字幕或译文。PanSub 是独立开发的非官方扩展，与 Panopto, Inc. 及 Waipapa Taumata Rau | University of Auckland 不存在隶属、授权、赞助或官方认可关系。
 
 ## PanSub 读取的数据
 
@@ -92,10 +95,9 @@ PanSub 会通过 `chrome.storage.local` 在你的设备本地保存：
 
 - 扩展开关状态
 - 字幕显示设置
-- 重复字幕行的翻译缓存
 - 音频识别语言和音频模式授权选择
 
-翻译缓存只用于减少重复翻译请求。你可以在 PanSub 设置页关闭缓存，也可以在 Chrome 中清除扩展数据。
+已翻译字幕仅在当前 Panopto 页面保持打开时缓存在内存中，不会写入 `chrome.storage.local`，关闭页面后缓存自动消失。PanSub 会清除旧版本创建的持久字幕缓存。
 
 ## 分析和追踪
 
@@ -105,7 +107,7 @@ PanSub 不包含分析统计、广告、追踪像素或远程账号系统。
 
 PanSub 请求以下权限：
 
-- `storage`，用于保存设置和本地翻译缓存
+- `storage`，用于保存设置、启用状态和授权选择
 - `activeTab`，用于确认用户从哪个 Panopto 标签页启动音频模式
 - `offscreen`，用于在 popup 关闭后继续维持用户主动启动的标签页音频流和本地识别
 - `tabCapture`，仅在用户启动音频模式后使用，只捕获当前标签页音频

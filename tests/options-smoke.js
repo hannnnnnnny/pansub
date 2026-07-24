@@ -113,6 +113,9 @@ async function main() {
   await page.goto(pathToFileURL(path.join(root, 'options.html')).toString());
   await page.waitForSelector('#interfaceLanguage');
   assert.strictEqual(await page.title(), 'PanSub Settings');
+  const accuracyNotice = await page.locator('#translationAccuracyNotice').textContent();
+  assert(accuracyNotice.includes('Machine translations may be inaccurate'));
+  assert(accuracyNotice.includes('original lecture content'));
   const desktopRailPosition = await page.locator('.rail').evaluate((el) => getComputedStyle(el).position);
   assert.strictEqual(desktopRailPosition, 'sticky');
 

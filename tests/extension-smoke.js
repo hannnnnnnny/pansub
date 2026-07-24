@@ -47,7 +47,9 @@ async function installChromeMock(page) {
     const store = {
       pansubEnabled: true,
       pansubSettings: initialSettings,
-      pansubCache: {}
+      pansubCache: {
+        'zh-CN::plain::legacy lecture caption': '旧版课程字幕缓存'
+      }
     };
 
     window.__pansubStore = store;
@@ -152,6 +154,9 @@ async function main() {
   await page.waitForSelector('#pansub-overlay-lock');
   await page.waitForTimeout(220);
 
+  const legacyCacheRemoved = await page.evaluate(() => !('pansubCache' in window.__pansubStore));
+  assert.strictEqual(legacyCacheRemoved, true, 'legacy persistent caption cache should be removed on startup');
+
   await page.evaluate(() => {
     document.querySelector('#overlayCaption').textContent = 'second database caption';
   });
@@ -170,6 +175,9 @@ async function main() {
     current.replaceWith(replacement);
   });
   await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('替换后的数据库字幕'));
+  await page.waitForTimeout(1400);
+  const captionCachePersisted = await page.evaluate(() => 'pansubCache' in window.__pansubStore);
+  assert.strictEqual(captionCachePersisted, false, 'translated captions should remain session-only');
   const observerDisconnects = await page.evaluate(() => window.__pansubObserverDisconnects);
   assert(observerDisconnects >= 1, 'replacing the native caption should disconnect the old observer');
 

@@ -118,9 +118,11 @@ const I18N = {
     provider: 'Provider',
     academicGlossary: 'Academic glossary',
     academicGlossaryHelp: 'Protect common academic terms across business, arts, IT, science, law, and more.',
-    localCache: 'Local translation cache',
-    localCacheHelp: 'Reuse translated lines during the same course recording.',
+    localCache: 'Session translation cache',
+    localCacheHelp: 'Reuse translated lines only while the current Panopto page remains open.',
     clearTranslationCache: 'Clear translation cache',
+    translationAccuracyTitle: 'Check the original lecture',
+    translationAccuracyDescription: 'Machine translations may be inaccurate. Treat the original lecture content as authoritative.',
     audioSettingsTitle: 'Audio recognition',
     audioSettingsDescription: 'Used only when you explicitly start Audio Mode from the popup.',
     audioSourceLanguage: 'Spoken English',
@@ -240,9 +242,11 @@ const I18N = {
     provider: '翻译服务',
     academicGlossary: '学术术语表',
     academicGlossaryHelp: '保护商科、艺术、IT、科学、法律等领域的常见学术术语。',
-    localCache: '本地翻译缓存',
-    localCacheHelp: '重复字幕会复用缓存，减少同一录像中的重复请求。',
+    localCache: '本次页面翻译缓存',
+    localCacheHelp: '仅在当前 Panopto 页面保持打开时复用已翻译字幕，关闭页面后自动清除。',
     clearTranslationCache: '清空翻译缓存',
+    translationAccuracyTitle: '请核对课程原文',
+    translationAccuracyDescription: '机器翻译可能不准确，请以课程英文原文和讲师说明为准。',
     audioSettingsTitle: '音频识别',
     audioSettingsDescription: '只有你从弹窗主动启动音频模式后才会使用。',
     audioSourceLanguage: '英语口音',
@@ -636,7 +640,9 @@ document.getElementById('clearDisabledSites').addEventListener('click', () => {
 });
 
 document.getElementById('clearTranslationCache').addEventListener('click', () => {
-  removeFromStorage(CACHE_KEY);
+  saveToStorage({ [CACHE_KEY]: { clearAt: Date.now() } }, () => {
+    removeFromStorage(CACHE_KEY);
+  });
 });
 
 document.getElementById('resetAudioConsent').addEventListener('click', () => {

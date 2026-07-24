@@ -32,7 +32,21 @@ async function installChromeMock(page) {
             setTimeout(() => callback(result), 0);
           },
           set(next, callback) {
-            Object.assign(store, next);
+            const changes = {};
+            for (const [key, value] of Object.entries(next)) {
+              changes[key] = { oldValue: store[key], newValue: value };
+              store[key] = value;
+            }
+            storageListeners.forEach((listener) => listener(changes, 'local'));
+            callback?.();
+          },
+          remove(keys, callback) {
+            const list = Array.isArray(keys) ? keys : [keys];
+            for (const key of list) {
+              const oldValue = store[key];
+              delete store[key];
+              storageListeners.forEach((listener) => listener({ [key]: { oldValue, newValue: undefined } }, 'local'));
+            }
             callback?.();
           }
         },

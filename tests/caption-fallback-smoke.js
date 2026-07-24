@@ -62,6 +62,19 @@ async function installChromeMock(page) {
             }
             listeners.forEach((listener) => listener(changes, 'local'));
             cb?.();
+          },
+          remove(keys, cb) {
+            const changes = {};
+            const list = Array.isArray(keys) ? keys : [keys];
+            for (const key of list) {
+              if (!(key in store)) continue;
+              changes[key] = { oldValue: store[key], newValue: undefined };
+              delete store[key];
+            }
+            if (Object.keys(changes).length) {
+              listeners.forEach((listener) => listener(changes, 'local'));
+            }
+            cb?.();
           }
         },
         onChanged: {

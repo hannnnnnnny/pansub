@@ -70,13 +70,17 @@ Features:
 - Stable subtitle anchoring reduces per-line jumping when captions reflow
 - Player-area anchoring keeps subtitles centered on the actual video, even with sidebars or DevTools open
 - Protects PanSub overlays and Panopto caption nodes from browser page translation when possible
-- Local translation cache for repeated caption lines
+- Session-only translation cache for repeated caption lines while the current Panopto page remains open
 - Debug logs for checking which Panopto caption element was detected
 
 Privacy note:
-Native-caption mode sends current caption text to Google Translate. Audio Mode starts only after an explicit user click; Chrome recognizes English locally and PanSub does not save audio or transcripts. Audio Mode prefers Chrome's local Translator. If it is unavailable, recognized text is sent to Google Translate only after separate consent. Settings, consent choices, and translation cache are stored locally with chrome.storage.local. PanSub does not include analytics, ads, tracking pixels, or an author-owned remote server.
+Native-caption mode sends current caption text to Google Translate. Audio Mode starts only after an explicit user click; Chrome recognizes English locally and PanSub does not save audio or transcripts. Audio Mode prefers Chrome's local Translator. If it is unavailable, recognized text is sent to Google Translate only after separate consent. Settings and consent choices are stored locally with chrome.storage.local. Translated caption cache remains only in memory for the current Panopto page session and is cleared when the page closes. PanSub does not include analytics, ads, tracking pixels, or an author-owned remote server.
 
 PanSub requires Chrome 139 or later. Native captions remain the preferred source; Audio Mode Beta is available for recordings without captions.
+
+Use PanSub only with course content you are authorised to access and for personal study only. Do not export or share course audio, captions, or translations. Machine translations may be inaccurate; treat the original lecture content as authoritative.
+
+PanSub is an independent, unofficial browser extension. It is not affiliated with, authorised by, sponsored by, or endorsed by Panopto, Inc. or Waipapa Taumata Rau | University of Auckland. All related names and trademarks belong to their respective owners.
 ```
 
 ## Privacy Tab
@@ -90,7 +94,7 @@ PanSub translates visible Panopto lecture captions, or user-started on-device sp
 Permission justification for `storage`:
 
 ```text
-Used to save the user's PanSub settings, enabled state, and local translation cache on the device.
+Used to save the user's PanSub settings, enabled state, and consent choices on the device. Translated caption lines are cached only in memory for the current page session and are not stored with this permission.
 ```
 
 Permission justification for `activeTab`:
@@ -254,13 +258,17 @@ Features:
 - Stable subtitle anchoring reduces per-line jumping when captions reflow
 - Player-area anchoring keeps subtitles centered on the actual video, even with sidebars or DevTools open
 - Protects PanSub overlays and Panopto caption nodes from browser page translation when possible
-- Local translation cache for repeated caption lines
+- Session-only translation cache for repeated caption lines while the current Panopto page remains open
 - Debug logs for checking which Panopto caption element was detected
 
 Privacy note:
-Native-caption mode sends current caption text to Google Translate. Audio Mode starts only after an explicit user click; Chrome recognizes English locally and PanSub does not save audio or transcripts. Audio Mode prefers Chrome's local Translator. If it is unavailable, recognized text is sent to Google Translate only after separate consent. Settings, consent choices, and translation cache are stored locally with chrome.storage.local. PanSub does not include analytics, ads, tracking pixels, or an author-owned remote server.
+Native-caption mode sends current caption text to Google Translate. Audio Mode starts only after an explicit user click; Chrome recognizes English locally and PanSub does not save audio or transcripts. Audio Mode prefers Chrome's local Translator. If it is unavailable, recognized text is sent to Google Translate only after separate consent. Settings and consent choices are stored locally with chrome.storage.local. Translated caption cache remains only in memory for the current Panopto page session and is cleared when the page closes. PanSub does not include analytics, ads, tracking pixels, or an author-owned remote server.
 
 PanSub requires Chrome 139 or later. Native captions remain the preferred source; Audio Mode Beta is available for recordings without captions.
+
+Use PanSub only with course content you are authorised to access and for personal study only. Do not export or share course audio, captions, or translations. Machine translations may be inaccurate; treat the original lecture content as authoritative.
+
+PanSub is an independent, unofficial browser extension. It is not affiliated with, authorised by, sponsored by, or endorsed by Panopto, Inc. or Waipapa Taumata Rau | University of Auckland. All related names and trademarks belong to their respective owners.
 ```
 
 ## Privacy 标签页
@@ -274,7 +282,7 @@ PanSub translates visible Panopto lecture captions, or user-started on-device sp
 `storage` 权限解释：
 
 ```text
-Used to save the user's PanSub settings, enabled state, and local translation cache on the device.
+Used to save the user's PanSub settings, enabled state, and consent choices on the device. Translated caption lines are cached only in memory for the current page session and are not stored with this permission.
 ```
 
 `activeTab` 权限解释：

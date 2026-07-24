@@ -129,6 +129,9 @@ async function main() {
   assert.strictEqual(await page.locator('#audioStart').isVisible(), true);
   await page.click('#audioStart');
   assert.strictEqual(await page.locator('#audioDisclosure').isVisible(), true);
+  const audioDisclosure = await page.locator('#audioDisclosure').textContent();
+  assert(audioDisclosure.includes('personal study only'), 'Audio Mode should state its personal-study purpose');
+  assert(audioDisclosure.includes('Do not export or share'), 'Audio Mode should prohibit exporting or sharing course content');
   await page.check('#audioDisclosureAccepted');
   await page.click('#audioConfirmStart');
   await page.waitForFunction(() => window.__pansubRuntimeMessages.some((message) => message.type === 'PANSUB_AUDIO_START'));

@@ -44,7 +44,6 @@
   let lastOriginalText = '';
   let lastTranslatedText = '';
   let debounceTimer = null;
-  let persistTimer = null;
   let translateSeq = 0;
   let activeTranslationController = null;
   let lastTranslateAt = 0;
@@ -2238,36 +2237,11 @@
     return `${settings.targetLanguage}::${glossaryVersion}::${text}`;
   }
 
-  function loadPersistentCache(stored) {
-    if (!stored || typeof stored !== 'object') return;
-    for (const [key, value] of Object.entries(stored)) {
-      if (typeof value === 'string') {
-        translationCache.set(key, value);
-      }
-    }
-    pruneTranslationCache();
-    debug(`[PanSub] loaded ${translationCache.size} cached translations`);
-  }
-
   function pruneTranslationCache() {
     while (translationCache.size > CACHE_LIMIT) {
       const oldestKey = translationCache.keys().next().value;
       translationCache.delete(oldestKey);
     }
-  }
-
-  function scheduleCachePersist() {
-    if (!settings.cacheEnabled) return;
-    if (persistTimer) clearTimeout(persistTimer);
-    persistTimer = setTimeout(() => {
-      const entries = Array.from(translationCache.entries()).slice(-CACHE_LIMIT);
-      chrome.storage.local.set({ [CACHE_KEY]: Object.fromEntries(entries) }, () => {
-        const error = chrome.runtime?.lastError;
-        if (error) {
-          console.warn('[PanSub] failed to save translation cache:', error.message);
-        }
-      });
-    }, 1200);
   }
 
   async function translate(text, signal) {
@@ -2284,7 +2258,6 @@
     if (translated) {
       translationCache.set(key, translated);
       pruneTranslationCache();
-      scheduleCachePersist();
     }
     return translated;
   }
@@ -2525,7 +2498,12 @@
 
   chrome.storage.local.get(['pansubEnabled', SETTINGS_KEY, CACHE_KEY], (result) => {
     mergeSettings(result[SETTINGS_KEY], result.pansubEnabled);
-    loadPersistentCache(result[CACHE_KEY]);
+    if (result[CACHE_KEY] !== undefined) {
+      chrome.storage.local.remove(CACHE_KEY, () => {
+        const error = chrome.runtime?.lastError;
+        if (error) console.warn('[PanSub] failed to remove legacy translation cache:', error.message);
+      });
+    }
     if (overlayEl) {
       applyVisibility();
       applyOverlayStyle();
@@ -2571,7 +2549,6 @@
     }
     if (changes[CACHE_KEY]) {
       translationCache.clear();
-      loadPersistentCache(changes[CACHE_KEY].newValue);
     }
   });
 })();
