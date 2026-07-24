@@ -156,7 +156,7 @@ Publish automatically after review: Off for staged review, On if you want immedi
 Extension package:
 
 ```text
-dist/pansub-1.2.0.zip
+dist/pansub-1.2.1.zip
 ```
 
 Icon:

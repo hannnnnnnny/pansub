@@ -35,7 +35,7 @@ async function main() {
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await page.goto(`chrome-extension://${extensionId}/popup.html`);
     await page.waitForSelector('#audioStart');
-    assert.strictEqual(await page.locator('.version').textContent(), '1.2.0');
+    assert.strictEqual(await page.locator('.version').textContent(), '1.2.1');
     await page.click('#audioStart');
     await page.check('#audioDisclosureAccepted');
     await page.click('#audioConfirmStart');
