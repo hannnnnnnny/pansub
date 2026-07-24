@@ -24,39 +24,18 @@
   const FLOATING_REGULAR_SIZE = 44;
   const FLOATING_SMALL_SIZE = 34;
   const FLOATING_MARGIN = 8;
+  const NATIVE_CAPTION_MISSING_MS = 5000;
   const GLOSSARY = window.PANSUB_GLOSSARY || { version: 'none', terms: [] };
-
-  const DEFAULT_SETTINGS = {
-    enabled: true,
-    interfaceLanguage: navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en',
-    targetLanguage: 'zh-CN',
-    displayMode: 'bilingual',
-    subtitlePosition: 'auto',
-    fontSize: 24,
-    originalFontSize: 15,
-    maxWidth: 80,
-    backgroundOpacity: 76,
-    overlayTheme: 'classic',
-    overlayFontFamily: 'system',
-    subtitleColor: '#ffffff',
-    originalColor: '#dbeafe',
-    overlayBackgroundColor: '#000000',
-    overlayBorderColor: '#ffffff',
-    overlayLocked: false,
-    overlayManualX: null,
-    overlayManualY: null,
-    hideNativeCaptions: false,
-    glossaryEnabled: true,
-    cacheEnabled: true,
-    debugLogs: false,
-    floatingButtonEnabled: true,
-    floatingButtonSide: 'right',
-    floatingButtonOpacity: 78,
-    floatingButtonHoverOnly: false,
-    floatingButtonX: null,
-    floatingButtonY: null,
-    floatingButtonSmall: false,
-    floatingButtonDisabledHosts: []
+  const DEFAULT_SETTINGS = window.PANSUB_DEFAULT_SETTINGS;
+  const AUDIO_PROTOCOL = window.PANSUB_AUDIO_PROTOCOL;
+  const AUDIO_STATE_API = window.PANSUB_AUDIO_STATE;
+  const AUDIO_MESSAGES = AUDIO_PROTOCOL?.messages || {
+    GET_STATE: 'PANSUB_AUDIO_GET_STATE',
+    STATE_CHANGED: 'PANSUB_AUDIO_STATE_CHANGED',
+    SUBTITLE: 'PANSUB_AUDIO_SUBTITLE',
+    STOP: 'PANSUB_AUDIO_STOP',
+    NATIVE_CAPTION_STATUS: 'PANSUB_NATIVE_CAPTION_STATUS',
+    OPEN_AUDIO_POPUP: 'PANSUB_OPEN_AUDIO_POPUP'
   };
 
   const translationCache = new Map();
@@ -65,8 +44,8 @@
   let lastOriginalText = '';
   let lastTranslatedText = '';
   let debounceTimer = null;
-  let persistTimer = null;
   let translateSeq = 0;
+  let activeTranslationController = null;
   let lastTranslateAt = 0;
   let translateBackoffUntil = 0;
   let overlayEl = null;
@@ -83,10 +62,44 @@
   let nativeCaptionEl = null;
   let captionPollStarted = false;
   let lastStablePlayerRect = null;
-  const observedCaptionEls = new WeakSet();
+  let captionObserver = null;
+  let observedCaptionEl = null;
+  let audioState = AUDIO_STATE_API?.createAudioState?.() || {
+    phase: 'idle',
+    sessionId: null,
+    tabId: null,
+    source: 'auto',
+    error: null,
+    detail: null,
+    updatedAt: 0
+  };
+  let lastAudioSequence = 0;
+  let audioRendered = false;
+  let captionDetectionStartedAt = Date.now();
+  let lastNativeCaptionAt = 0;
+  let lastReportedNativeStatus = null;
+  let lastNativeStatusReportAt = 0;
 
   function debug(...args) {
     if (settings.debugLogs) console.log(...args);
+  }
+
+  function audioOwnsOverlay() {
+    return audioState.source === 'audio'
+      && Boolean(audioState.sessionId)
+      && !['idle', 'native', 'available'].includes(audioState.phase);
+  }
+
+  function reportNativeCaptionStatus(hasCaptions) {
+    const now = Date.now();
+    if (lastReportedNativeStatus === hasCaptions && now - lastNativeStatusReportAt < 5000) return;
+    lastReportedNativeStatus = hasCaptions;
+    lastNativeStatusReportAt = now;
+    chrome.runtime.sendMessage({
+      type: AUDIO_MESSAGES.NATIVE_CAPTION_STATUS,
+      hasCaptions,
+      observedAt: now
+    });
   }
 
   function clamp(value, min, max) {
@@ -136,14 +149,41 @@
     return /[\u3400-\u9fff\u3040-\u30ff\uac00-\ud7af]/.test(text);
   }
 
+  function hasHan(text) {
+    return /[\u3400-\u9fff]/.test(text);
+  }
+
+  function hasKana(text) {
+    return /[\u3040-\u30ff]/.test(text);
+  }
+
+  function hasHangul(text) {
+    return /[\uac00-\ud7af]/.test(text);
+  }
+
   function latinRatio(text) {
     const letters = text.match(/[A-Za-z]/g)?.length || 0;
     const visible = text.replace(/\s/g, '').length || 1;
     return letters / visible;
   }
 
-  function sourceLooksTranslated(text) {
-    return hasCjk(text) && latinRatio(text) < 0.25;
+  function detectedTextLanguage(text) {
+    if (hasHangul(text)) return 'ko';
+    if (hasKana(text)) return 'ja';
+    if (hasHan(text) && latinRatio(text) < 0.4) return 'zh-CN';
+    if (latinRatio(text) > 0.5) return 'en';
+    return '';
+  }
+
+  function sourceAlreadyMatchesTarget(text) {
+    if (!text) return false;
+    if (settings.targetLanguage === 'ko') return hasHangul(text);
+    if (settings.targetLanguage === 'ja') return hasKana(text);
+    if (settings.targetLanguage.startsWith('zh')) {
+      return hasHan(text) && !hasKana(text) && !hasHangul(text) && latinRatio(text) < 0.25;
+    }
+    if (settings.targetLanguage === 'en') return latinRatio(text) > 0.55 && !hasCjk(text);
+    return false;
   }
 
   function currentHost() {
@@ -445,10 +485,16 @@
     floatingEl = document.createElement('button');
     floatingEl.id = FLOATING_ID;
     floatingEl.type = 'button';
-    floatingEl.textContent = 'P';
+    const floatingMark = document.createElement('span');
+    floatingMark.dataset.pansubFloatingPart = 'mark';
+    floatingMark.textContent = 'P';
+    const floatingSignal = document.createElement('span');
+    floatingSignal.dataset.pansubFloatingPart = 'signal';
+    floatingSignal.setAttribute('aria-hidden', 'true');
+    floatingEl.append(floatingMark, floatingSignal);
     markNoTranslate(floatingEl);
-    floatingEl.title = 'PanSub quick controls';
-    floatingEl.setAttribute('aria-label', 'PanSub quick controls');
+    floatingEl.title = quickCopy('quickControls');
+    floatingEl.setAttribute('aria-label', floatingEl.title);
     floatingEl.setAttribute('aria-expanded', 'false');
     floatingEl.addEventListener('click', (event) => {
       event.preventDefault();
@@ -495,6 +541,7 @@
   const QUICK_COPY = {
     en: {
       title: 'PanSub',
+      quickControls: 'PanSub quick controls',
       enabled: 'Enabled',
       disabled: 'Disabled',
       showSubtitles: 'Show subtitles',
@@ -519,10 +566,25 @@
       resetPosition: 'Reset position',
       buttonControlsNote: 'Hidden buttons can be restored from the PanSub settings page.',
       lockSubtitleBox: 'Lock subtitle box',
-      unlockSubtitleBox: 'Unlock subtitle box'
+      unlockSubtitleBox: 'Unlock subtitle box',
+      audioAvailable: 'No native captions detected',
+      audioAvailableDetail: 'Audio Mode can listen to this tab after you start it.',
+      audioPreparing: 'Preparing local recognition',
+      audioPreparingDetail: 'Chrome is checking the on-device English language pack.',
+      audioListening: 'Listening to tab audio',
+      audioListeningDetail: 'Speech recognition runs locally on this device.',
+      audioDegraded: 'Recognition is recovering',
+      audioDegradedDetail: 'PanSub is restarting the local recognizer.',
+      audioError: 'Audio Mode needs attention',
+      audioErrorDetail: 'Open PanSub to review the error and retry.',
+      audioStopping: 'Stopping Audio Mode',
+      audioStoppingDetail: 'Releasing the captured tab audio.',
+      openAudioMode: 'Open Audio Mode',
+      stopAudioMode: 'Stop listening'
     },
     'zh-CN': {
       title: 'PanSub',
+      quickControls: 'PanSub 快捷控制',
       enabled: '已启用',
       disabled: '已关闭',
       showSubtitles: '显示字幕',
@@ -547,7 +609,21 @@
       resetPosition: '重置位置',
       buttonControlsNote: '隐藏后的悬浮球可以在 PanSub 设置页恢复。',
       lockSubtitleBox: '锁定字幕框',
-      unlockSubtitleBox: '解锁字幕框'
+      unlockSubtitleBox: '解锁字幕框',
+      audioAvailable: '未检测到原生字幕',
+      audioAvailableDetail: '你可以从插件弹窗手动启动音频模式。',
+      audioPreparing: '正在准备本地识别',
+      audioPreparingDetail: 'Chrome 正在检查设备上的英语语言包。',
+      audioListening: '正在识别标签页音频',
+      audioListeningDetail: '语音识别只在此设备本地运行。',
+      audioDegraded: '识别正在恢复',
+      audioDegradedDetail: 'PanSub 正在重新启动本地识别器。',
+      audioError: '音频模式需要处理',
+      audioErrorDetail: '打开 PanSub 查看错误并重试。',
+      audioStopping: '正在停止音频模式',
+      audioStoppingDetail: '正在释放标签页音频。',
+      openAudioMode: '打开音频模式',
+      stopAudioMode: '停止识别'
     }
   };
 
@@ -558,6 +634,18 @@
 
   function setStyles(el, styles) {
     Object.assign(el.style, styles);
+  }
+
+  function motionTransition(value) {
+    return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'none' : value;
+  }
+
+  function animatePanelOpen(panel) {
+    if (!panel?.animate || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+    panel.animate([
+      { opacity: 0, transform: 'translateY(-50%) scale(.94)' },
+      { opacity: 1, transform: 'translateY(-50%) scale(1)' }
+    ], { duration: 190, easing: 'cubic-bezier(.2,.8,.2,1)' });
   }
 
   function normalizeHexColor(value, fallback) {
@@ -775,7 +863,9 @@
 
     floatingPanelEl = document.createElement('section');
     floatingPanelEl.id = FLOATING_PANEL_ID;
-    floatingPanelEl.setAttribute('aria-label', 'PanSub quick controls');
+    floatingPanelEl.setAttribute('role', 'dialog');
+    floatingPanelEl.setAttribute('aria-modal', 'false');
+    floatingPanelEl.setAttribute('aria-label', quickCopy('quickControls'));
     markNoTranslate(floatingPanelEl);
 
     const header = document.createElement('div');
@@ -785,6 +875,32 @@
     const status = document.createElement('span');
     status.dataset.pansubText = 'status';
     header.append(title, status);
+
+    const audioSection = document.createElement('div');
+    audioSection.dataset.pansubPart = 'audio';
+    const audioStatus = document.createElement('strong');
+    audioStatus.dataset.pansubAudio = 'status';
+    const audioDetail = document.createElement('small');
+    audioDetail.dataset.pansubAudio = 'detail';
+    const audioStart = document.createElement('button');
+    audioStart.type = 'button';
+    audioStart.dataset.pansubAction = 'audioMode';
+    audioStart.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      chrome.runtime.sendMessage({ type: AUDIO_MESSAGES.OPEN_AUDIO_POPUP });
+      toggleFloatingPanel(false);
+    });
+    const audioStop = document.createElement('button');
+    audioStop.type = 'button';
+    audioStop.dataset.pansubAction = 'audioStop';
+    audioStop.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      chrome.runtime.sendMessage({ type: AUDIO_MESSAGES.STOP });
+      toggleFloatingPanel(false);
+    });
+    audioSection.append(audioStatus, audioDetail, audioStart, audioStop);
 
     const enabledRow = createFloatingSwitch('enabled', 'showSubtitles');
     const modeRow = createFloatingSelect('displayMode', 'mode', [
@@ -825,7 +941,7 @@
     actions.dataset.pansubPart = 'actions';
     actions.append(floatingSettingsButton, settingsButton);
 
-    floatingPanelEl.append(header, enabledRow, modeRow, targetRow, actions);
+    floatingPanelEl.append(header, audioSection, enabledRow, modeRow, targetRow, actions);
     markTreeNoTranslate(floatingPanelEl);
     extensionHost().appendChild(floatingPanelEl);
     bindFloatingPanelControls();
@@ -870,7 +986,9 @@
 
     floatingSettingsEl = document.createElement('section');
     floatingSettingsEl.id = FLOATING_SETTINGS_ID;
-    floatingSettingsEl.setAttribute('aria-label', 'PanSub floating ball settings');
+    floatingSettingsEl.setAttribute('role', 'dialog');
+    floatingSettingsEl.setAttribute('aria-modal', 'false');
+    floatingSettingsEl.setAttribute('aria-label', quickCopy('floatingSettingsTitle'));
     markNoTranslate(floatingSettingsEl);
 
     const header = document.createElement('div');
@@ -880,12 +998,12 @@
     const close = document.createElement('button');
     close.type = 'button';
     close.dataset.pansubFloatAction = 'close';
-    close.setAttribute('aria-label', 'Close');
+    close.setAttribute('aria-label', quickCopy('close'));
     close.textContent = '×';
     close.addEventListener('click', (event) => {
       event.preventDefault();
       event.stopPropagation();
-      closeFloatingSettings();
+      closeFloatingSettings(true);
     });
     header.append(title, close);
 
@@ -953,13 +1071,18 @@
   function openFloatingSettings() {
     createFloatingSettingsPanel();
     floatingSettingsOpen = true;
-    applyFloatingSettingsStyle();
+    applyFloatingButtonStyle();
+    animatePanelOpen(floatingSettingsEl);
     updateFloatingSettingsPanel();
+    window.setTimeout(() => {
+      floatingSettingsEl?.querySelector('[data-pansub-float-control="floatingButtonSmall"]')?.focus();
+    }, 0);
   }
 
-  function closeFloatingSettings() {
+  function closeFloatingSettings(restoreFocus = false) {
     floatingSettingsOpen = false;
-    applyFloatingSettingsStyle();
+    applyFloatingButtonStyle();
+    if (restoreFocus) floatingEl?.focus();
   }
 
   function runFloatingCommand(action) {
@@ -1112,7 +1235,7 @@
 
     document.addEventListener('click', (event) => {
       if (floatingSettingsOpen && !floatingSettingsEl?.contains(event.target) && !floatingEl?.contains(event.target)) {
-        closeFloatingSettings();
+        closeFloatingSettings(false);
       }
       if (!floatingPanelOpen) return;
       if (floatingEl?.contains(event.target) || floatingPanelEl?.contains(event.target)) return;
@@ -1121,33 +1244,42 @@
 
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
-        toggleFloatingPanel(false);
-        closeFloatingSettings();
+        toggleFloatingPanel(false, true);
+        closeFloatingSettings(true);
       }
     });
   }
 
-  function toggleFloatingPanel(nextOpen) {
+  function toggleFloatingPanel(nextOpen, restoreFocus = false) {
     createFloatingPanel();
     floatingPanelOpen = typeof nextOpen === 'boolean' ? nextOpen : !floatingPanelOpen;
-    if (floatingPanelOpen) closeFloatingSettings();
+    if (floatingPanelOpen) closeFloatingSettings(false);
     if (floatingEl) {
       floatingEl.setAttribute('aria-expanded', String(floatingPanelOpen));
     }
-    applyFloatingPanelStyle();
+    applyFloatingButtonStyle();
     updateFloatingPanel();
+    if (floatingPanelOpen) {
+      animatePanelOpen(floatingPanelEl);
+      window.setTimeout(() => {
+        floatingPanelEl?.querySelector('[data-pansub-control="enabled"]')?.focus();
+      }, 0);
+    } else if (restoreFocus) {
+      floatingEl?.focus();
+    }
   }
 
   function applyVisibility() {
     if (!overlayEl) return;
     const hasVisibleSubtitle = settings.displayMode !== 'translation'
       || Boolean(lastTranslatedText)
-      || sourceLooksTranslated(lastOriginalText);
+      || sourceAlreadyMatchesTarget(lastOriginalText);
     overlayEl.style.display = settings.enabled && hasVisibleSubtitle ? 'block' : 'none';
   }
 
   function applyFloatingButtonStyle() {
     if (!floatingEl) return;
+    floatingEl.dataset.audioState = audioState.phase;
     const visible = isFloatingButtonVisible();
     const alpha = clamp(settings.floatingButtonOpacity, 20, 100) / 100;
     const position = floatingPosition();
@@ -1160,32 +1292,74 @@
       'bottom: auto',
       `width: ${size}px`,
       `height: ${size}px`,
-      'border: 0',
+      `border: 1px solid ${settings.enabled ? 'rgba(110,231,200,.5)' : 'rgba(203,213,225,.24)'}`,
       'border-radius: 50%',
-      `background: rgba(${settings.enabled ? '47,109,246' : '93,103,118'},${alpha})`,
+      `background: rgba(${settings.enabled ? '10,119,102' : '63,74,72'},${alpha})`,
       'color: #fff',
       `font: 800 ${settings.floatingButtonSmall ? 15 : 18}px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`,
-      'box-shadow: 0 10px 24px rgba(0,0,0,0.26)',
+      floatingPanelOpen || floatingSettingsOpen
+        ? 'box-shadow: 0 0 0 4px rgba(110,231,200,.12), 0 14px 32px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.2)'
+        : 'box-shadow: 0 10px 24px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.18)',
       'z-index: 2147483647',
       floatingDrag ? 'cursor: grabbing' : 'cursor: grab',
       'pointer-events: auto',
       'user-select: none',
       'touch-action: none',
-      'transform: none',
+      floatingPanelOpen || floatingSettingsOpen ? 'transform: scale(1.06)' : 'transform: none',
       settings.floatingButtonHoverOnly ? 'opacity: 0.2' : 'opacity: 1',
-      floatingDrag ? 'transition: none' : 'transition: opacity .16s ease, transform .16s ease, background .16s ease',
+      floatingDrag ? 'transition: none' : `transition: ${motionTransition('opacity .18s ease, transform .2s cubic-bezier(.2,.8,.2,1), background .18s ease, border-color .18s ease, box-shadow .18s ease')}`,
       visible ? 'display: block' : 'display: none'
     ].join(';');
+
+    const mark = floatingEl.querySelector('[data-pansub-floating-part="mark"]');
+    const signal = floatingEl.querySelector('[data-pansub-floating-part="signal"]');
+    if (mark) {
+      mark.style.cssText = 'display:grid;place-items:center;width:100%;height:100%;pointer-events:none;';
+    }
+    if (signal) {
+      const signalColors = {
+        available: '#f59e0b',
+        permission: '#60a5fa',
+        preparing: '#60a5fa',
+        listening: '#34d399',
+        degraded: '#f59e0b',
+        stopping: '#94a3b8',
+        error: '#fb7185'
+      };
+      const signalColor = signalColors[audioState.phase] || (settings.enabled ? '#6ee7c8' : '#94a3b8');
+      signal.style.cssText = [
+        'position:absolute',
+        'right:2px',
+        'top:2px',
+        `width:${settings.floatingButtonSmall ? 6 : 7}px`,
+        `height:${settings.floatingButtonSmall ? 6 : 7}px`,
+        'border:2px solid rgba(8,18,17,.88)',
+        'border-radius:50%',
+        `background:${signalColor}`,
+        settings.enabled ? 'box-shadow:0 0 0 3px rgba(110,231,200,.1),0 0 10px rgba(110,231,200,.6)' : 'box-shadow:none',
+        'pointer-events:none'
+      ].join(';');
+      signal.getAnimations?.().forEach((animation) => animation.cancel());
+      if (audioState.phase === 'listening'
+        && signal.animate
+        && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+        signal.animate([
+          { transform: 'scale(.82)', opacity: .7 },
+          { transform: 'scale(1.18)', opacity: 1 },
+          { transform: 'scale(.82)', opacity: .7 }
+        ], { duration: 1100, iterations: Infinity, easing: 'ease-in-out' });
+      }
+    }
 
     floatingEl.onmouseenter = () => {
       if (floatingDrag) return;
       floatingEl.style.opacity = '1';
-      floatingEl.style.transform = 'scale(1.04)';
+      floatingEl.style.transform = 'scale(1.08)';
     };
     floatingEl.onmouseleave = () => {
       if (floatingDrag) return;
       floatingEl.style.opacity = settings.floatingButtonHoverOnly ? '0.2' : '1';
-      floatingEl.style.transform = 'none';
+      floatingEl.style.transform = floatingPanelOpen || floatingSettingsOpen ? 'scale(1.06)' : 'none';
     };
 
     if (!visible) floatingPanelOpen = false;
@@ -1197,7 +1371,9 @@
   function applyFloatingPanelStyle() {
     if (!floatingPanelEl) return;
 
-    const display = isFloatingButtonVisible() && floatingPanelOpen ? 'block' : 'none';
+    const buttonVisible = isFloatingButtonVisible();
+    const panelVisible = buttonVisible && floatingPanelOpen;
+    const display = panelVisible ? 'block' : 'none';
     const buttonPosition = floatingPosition();
     const size = floatingButtonSize();
     const panelWidth = Math.min(260, Math.max(140, window.innerWidth - FLOATING_MARGIN * 2));
@@ -1220,15 +1396,19 @@
       bottom: 'auto',
       width: `${panelWidth}px`,
       maxWidth: 'calc(100vw - 16px)',
-      color: '#f8fafc',
-      background: 'rgba(15, 23, 42, 0.96)',
-      border: '1px solid rgba(148, 163, 184, 0.28)',
-      borderRadius: '12px',
-      boxShadow: '0 22px 48px rgba(0,0,0,0.34)',
+      color: '#f2faf7',
+      background: 'rgba(13, 21, 21, 0.97)',
+      border: '1px solid rgba(110, 231, 200, 0.2)',
+      borderRadius: '8px',
+      boxShadow: '0 24px 56px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,.04)',
       padding: '12px',
       zIndex: '2147483647',
-      pointerEvents: 'auto',
-      transform: 'translateY(-50%)',
+      pointerEvents: panelVisible ? 'auto' : 'none',
+      opacity: panelVisible ? '1' : '0',
+      visibility: panelVisible ? 'visible' : 'hidden',
+      transform: panelVisible ? 'translateY(-50%) scale(1)' : 'translateY(-50%) scale(.94)',
+      transformOrigin: opensRight ? 'left center' : 'right center',
+      transition: motionTransition('opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1), visibility .18s ease'),
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
       fontSize: '13px',
       lineHeight: '1.35',
@@ -1251,11 +1431,29 @@
       setStyles(el, {
         borderRadius: '999px',
         padding: '3px 8px',
-        background: settings.enabled ? 'rgba(34,197,94,.16)' : 'rgba(148,163,184,.16)',
-        color: settings.enabled ? '#86efac' : '#cbd5e1',
+        border: `1px solid ${settings.enabled ? 'rgba(110,231,200,.2)' : 'rgba(148,163,184,.16)'}`,
+        background: settings.enabled ? 'rgba(110,231,200,.1)' : 'rgba(148,163,184,.1)',
+        color: settings.enabled ? '#6ee7c8' : '#cbd5e1',
         fontSize: '12px',
         fontWeight: '700'
       });
+    });
+    floatingPanelEl.querySelectorAll('[data-pansub-part="audio"]').forEach((el) => {
+      setStyles(el, {
+        display: 'none',
+        gap: '5px',
+        margin: '0 0 8px',
+        padding: '10px',
+        border: '1px solid rgba(245,158,11,.24)',
+        borderRadius: '7px',
+        background: 'rgba(245,158,11,.08)'
+      });
+    });
+    floatingPanelEl.querySelectorAll('[data-pansub-audio="status"]').forEach((el) => {
+      setStyles(el, { color: '#f8fafc', fontSize: '13px' });
+    });
+    floatingPanelEl.querySelectorAll('[data-pansub-audio="detail"]').forEach((el) => {
+      setStyles(el, { color: '#b8c7c2', fontSize: '12px', lineHeight: '1.4' });
     });
     floatingPanelEl.querySelectorAll('[data-pansub-part="row"]').forEach((el) => {
       setStyles(el, {
@@ -1264,7 +1462,7 @@
         justifyContent: 'space-between',
         gap: '12px',
         padding: '9px 0',
-        borderTop: '1px solid rgba(148,163,184,.18)'
+        borderTop: '1px solid rgba(255,255,255,.08)'
       });
     });
     floatingPanelEl.querySelectorAll('[data-pansub-part="stack"]').forEach((el) => {
@@ -1272,7 +1470,7 @@
         display: 'grid',
         gap: '6px',
         padding: '9px 0',
-        borderTop: '1px solid rgba(148,163,184,.18)'
+        borderTop: '1px solid rgba(255,255,255,.08)'
       });
     });
     floatingPanelEl.querySelectorAll('[data-pansub-part="actions"]').forEach((el) => {
@@ -1281,30 +1479,30 @@
         gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
         gap: '8px',
         paddingTop: '10px',
-        borderTop: '1px solid rgba(148,163,184,.18)'
+        borderTop: '1px solid rgba(255,255,255,.08)'
       });
     });
     floatingPanelEl.querySelectorAll('span').forEach((el) => {
       if (el.dataset.pansubText === 'status') return;
-      setStyles(el, { color: '#dbeafe', fontWeight: '700' });
+      setStyles(el, { color: '#d6e6e1', fontWeight: '700' });
     });
     floatingPanelEl.querySelectorAll('input[type="checkbox"]').forEach((el) => {
       setStyles(el, {
         width: '38px',
         height: '22px',
         margin: '0',
-        accentColor: '#3b82f6',
+        accentColor: '#32c9a6',
         cursor: 'pointer'
       });
     });
     floatingPanelEl.querySelectorAll('select').forEach((el) => {
       setStyles(el, {
         width: '100%',
-        border: '1px solid rgba(148,163,184,.28)',
-        borderRadius: '8px',
+        border: '1px solid rgba(255,255,255,.12)',
+        borderRadius: '7px',
         padding: '7px 8px',
         color: '#f8fafc',
-        background: '#111827',
+        background: '#14201e',
         font: '600 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         cursor: 'pointer'
       });
@@ -1313,20 +1511,20 @@
       setStyles(el, {
         width: '100%',
         marginTop: '0',
-        border: '1px solid rgba(96,165,250,.42)',
-        borderRadius: '8px',
+        border: '1px solid rgba(110,231,200,.24)',
+        borderRadius: '7px',
         padding: '9px 10px',
-        color: '#dbeafe',
-        background: 'rgba(37, 99, 235, .2)',
+        color: '#dff8f1',
+        background: 'rgba(110,231,200,.09)',
         font: '800 13px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
         cursor: 'pointer'
       });
     });
     floatingPanelEl.querySelectorAll('[data-pansub-variant="quiet"]').forEach((el) => {
       setStyles(el, {
-        borderColor: 'rgba(148,163,184,.26)',
+        borderColor: 'rgba(255,255,255,.11)',
         color: '#cbd5e1',
-        background: 'rgba(15,23,42,.18)'
+        background: 'rgba(255,255,255,.025)'
       });
     });
   }
@@ -1334,7 +1532,9 @@
   function applyFloatingSettingsStyle() {
     if (!floatingSettingsEl) return;
 
-    const display = isFloatingButtonVisible() && floatingSettingsOpen ? 'block' : 'none';
+    const buttonVisible = isFloatingButtonVisible();
+    const panelVisible = buttonVisible && floatingSettingsOpen;
+    const display = panelVisible ? 'block' : 'none';
     const buttonPosition = floatingPosition();
     const size = floatingButtonSize();
     const panelWidth = Math.min(286, Math.max(180, window.innerWidth - FLOATING_MARGIN * 2));
@@ -1358,13 +1558,17 @@
       maxWidth: 'calc(100vw - 16px)',
       padding: '12px',
       color: '#f8fafc',
-      background: 'linear-gradient(180deg, rgba(8,17,31,.98), rgba(15,23,42,.96))',
-      border: '1px solid rgba(125, 211, 252, .22)',
-      borderRadius: '12px',
-      boxShadow: '0 22px 48px rgba(0,0,0,.38)',
+      background: 'rgba(13,21,21,.98)',
+      border: '1px solid rgba(110,231,200,.2)',
+      borderRadius: '8px',
+      boxShadow: '0 24px 56px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.04)',
       zIndex: '2147483647',
-      pointerEvents: 'auto',
-      transform: 'translateY(-50%)',
+      pointerEvents: panelVisible ? 'auto' : 'none',
+      opacity: panelVisible ? '1' : '0',
+      visibility: panelVisible ? 'visible' : 'hidden',
+      transform: panelVisible ? 'translateY(-50%) scale(1)' : 'translateY(-50%) scale(.94)',
+      transformOrigin: opensRight ? 'left center' : 'right center',
+      transition: motionTransition('opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1), visibility .18s ease'),
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif',
       fontSize: '13px',
       lineHeight: '1.35',
@@ -1458,6 +1662,11 @@
     const targetLanguage = floatingPanelEl.querySelector('[data-pansub-control="targetLanguage"]');
     const settingsButton = floatingPanelEl.querySelector('[data-pansub-action="settings"]');
     const floatingSettingsButton = floatingPanelEl.querySelector('[data-pansub-action="floatingSettings"]');
+    const audioSection = floatingPanelEl.querySelector('[data-pansub-part="audio"]');
+    const audioStatus = floatingPanelEl.querySelector('[data-pansub-audio="status"]');
+    const audioDetail = floatingPanelEl.querySelector('[data-pansub-audio="detail"]');
+    const audioStart = floatingPanelEl.querySelector('[data-pansub-action="audioMode"]');
+    const audioStop = floatingPanelEl.querySelector('[data-pansub-action="audioStop"]');
 
     if (title) title.textContent = quickCopy('title');
     if (status) status.textContent = quickCopy(settings.enabled ? 'enabled' : 'disabled');
@@ -1466,6 +1675,34 @@
     if (targetLanguage) targetLanguage.value = settings.targetLanguage;
     if (settingsButton) settingsButton.textContent = quickCopy('settings');
     if (floatingSettingsButton) floatingSettingsButton.textContent = quickCopy('floatingSettings');
+    const phaseCopy = {
+      available: ['audioAvailable', 'audioAvailableDetail'],
+      permission: ['audioPreparing', 'audioPreparingDetail'],
+      preparing: ['audioPreparing', 'audioPreparingDetail'],
+      listening: ['audioListening', 'audioListeningDetail'],
+      degraded: ['audioDegraded', 'audioDegradedDetail'],
+      error: ['audioError', 'audioErrorDetail'],
+      stopping: ['audioStopping', 'audioStoppingDetail']
+    };
+    const audioCopy = phaseCopy[audioState.phase];
+    if (audioSection) audioSection.style.display = audioCopy ? 'grid' : 'none';
+    if (audioStatus && audioCopy) audioStatus.textContent = quickCopy(audioCopy[0]);
+    if (audioDetail && audioCopy) audioDetail.textContent = quickCopy(audioCopy[1]);
+    if (audioStart) {
+      audioStart.textContent = quickCopy('openAudioMode');
+      audioStart.style.display = ['available', 'error'].includes(audioState.phase) ? 'block' : 'none';
+    }
+    if (audioStop) {
+      audioStop.textContent = quickCopy('stopAudioMode');
+      audioStop.style.display = ['permission', 'preparing', 'listening', 'degraded', 'stopping'].includes(audioState.phase)
+        ? 'block'
+        : 'none';
+    }
+    if (floatingEl) {
+      floatingEl.title = quickCopy('quickControls');
+      floatingEl.setAttribute('aria-label', floatingEl.title);
+    }
+    floatingPanelEl.setAttribute('aria-label', quickCopy('quickControls'));
 
     floatingPanelEl.querySelectorAll('[data-pansub-label]').forEach((el) => {
       el.textContent = quickCopy(el.dataset.pansubLabel);
@@ -1477,6 +1714,8 @@
 
     const small = floatingSettingsEl.querySelector('[data-pansub-float-control="floatingButtonSmall"]');
     if (small) small.checked = Boolean(settings.floatingButtonSmall);
+    floatingSettingsEl.setAttribute('aria-label', quickCopy('floatingSettingsTitle'));
+    floatingSettingsEl.querySelector('[data-pansub-float-action="close"]')?.setAttribute('aria-label', quickCopy('close'));
 
     floatingSettingsEl.querySelectorAll('[data-pansub-label]').forEach((el) => {
       el.textContent = quickCopy(el.dataset.pansubLabel);
@@ -1567,7 +1806,7 @@
       `color: ${subtitleColor}`,
       'padding: 8px 14px',
       'border-radius: 8px',
-      'z-index: 2147483647',
+      'z-index: 2147483645',
       'pointer-events: auto',
       'text-align: center',
       `font-family: ${overlayFontFamily()}`,
@@ -1790,7 +2029,7 @@
   function updateOverlay(originalText, translatedText) {
     if (!overlayEl) createOverlay();
     markTreeNoTranslate(overlayEl);
-    const originalLang = sourceLooksTranslated(originalText) ? settings.targetLanguage : 'en';
+    const originalLang = detectedTextLanguage(originalText) || 'en';
     document.getElementById(ORIGINAL_ID)?.setAttribute('lang', originalLang);
     document.getElementById(TRANSLATED_ID)?.setAttribute('lang', settings.targetLanguage);
     lastOriginalText = originalText;
@@ -1915,43 +2154,72 @@
     return restored;
   }
 
-  function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+  function abortException() {
+    return new DOMException('Translation cancelled', 'AbortError');
   }
 
-  async function waitForTranslateSlot() {
+  function cancelActiveTranslation() {
+    activeTranslationController?.abort();
+    activeTranslationController = null;
+  }
+
+  function sleep(ms, signal) {
+    return new Promise((resolve, reject) => {
+      if (signal?.aborted) {
+        reject(abortException());
+        return;
+      }
+
+      const timer = setTimeout(() => {
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
+      }, ms);
+      const onAbort = () => {
+        clearTimeout(timer);
+        reject(abortException());
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
+    });
+  }
+
+  async function waitForTranslateSlot(signal) {
     const now = Date.now();
     const throttleWait = Math.max(0, TRANSLATE_MIN_INTERVAL_MS - (now - lastTranslateAt));
     const backoffWait = Math.max(0, translateBackoffUntil - now);
     const wait = Math.max(throttleWait, backoffWait);
     if (wait > 0) {
-      await sleep(wait);
+      await sleep(wait, signal);
     }
+    if (signal?.aborted) throw abortException();
     lastTranslateAt = Date.now();
   }
 
   function translationParams(text) {
     return new URLSearchParams({
       client: 'gtx',
-      sl: 'en',
+      sl: 'auto',
       tl: settings.targetLanguage,
       dt: 't',
       q: text
     });
   }
 
-  async function fetchTranslationData(text) {
-    await waitForTranslateSlot();
+  async function fetchTranslationData(text, signal) {
+    await waitForTranslateSlot(signal);
     const params = translationParams(text);
     const baseUrl = 'https://translate.googleapis.com/translate_a/single';
     const usePost = text.length > POST_TEXT_LENGTH;
-    return fetch(usePost ? baseUrl : `${baseUrl}?${params.toString()}`, usePost ? {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-      },
-      body: params.toString()
-    } : undefined);
+    const requestOptions = { signal };
+    if (usePost) {
+      Object.assign(requestOptions, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+        body: params.toString()
+      });
+    }
+    return fetch(usePost ? baseUrl : `${baseUrl}?${params.toString()}`, requestOptions);
   }
 
   function flattenTranslation(data) {
@@ -1969,17 +2237,6 @@
     return `${settings.targetLanguage}::${glossaryVersion}::${text}`;
   }
 
-  function loadPersistentCache(stored) {
-    if (!stored || typeof stored !== 'object') return;
-    for (const [key, value] of Object.entries(stored)) {
-      if (typeof value === 'string') {
-        translationCache.set(key, value);
-      }
-    }
-    pruneTranslationCache();
-    debug(`[PanSub] loaded ${translationCache.size} cached translations`);
-  }
-
   function pruneTranslationCache() {
     while (translationCache.size > CACHE_LIMIT) {
       const oldestKey = translationCache.keys().next().value;
@@ -1987,23 +2244,9 @@
     }
   }
 
-  function scheduleCachePersist() {
-    if (!settings.cacheEnabled) return;
-    if (persistTimer) clearTimeout(persistTimer);
-    persistTimer = setTimeout(() => {
-      const entries = Array.from(translationCache.entries()).slice(-CACHE_LIMIT);
-      chrome.storage.local.set({ [CACHE_KEY]: Object.fromEntries(entries) }, () => {
-        const error = chrome.runtime?.lastError;
-        if (error) {
-          console.warn('[PanSub] failed to save translation cache:', error.message);
-        }
-      });
-    }, 1200);
-  }
-
-  async function translate(text) {
+  async function translate(text, signal) {
     if (!settings.cacheEnabled) {
-      return requestTranslation(text);
+      return requestTranslation(text, signal);
     }
 
     const key = cacheKey(text);
@@ -2011,34 +2254,43 @@
       return translationCache.get(key);
     }
 
-    const translated = await requestTranslation(text);
+    const translated = await requestTranslation(text, signal);
     if (translated) {
       translationCache.set(key, translated);
       pruneTranslationCache();
-      scheduleCachePersist();
     }
     return translated;
   }
 
   async function refreshCurrentTranslation() {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    cancelActiveTranslation();
     const text = lastOriginalText;
-    if (!text || sourceLooksTranslated(text) || settings.displayMode === 'original') return;
+    if (!text || sourceAlreadyMatchesTarget(text) || settings.displayMode === 'original') return;
 
     const currentSeq = ++translateSeq;
+    const controller = new AbortController();
+    activeTranslationController = controller;
     updateOverlay(text, '');
-    const translated = await translate(text);
-    if (translated && currentSeq === translateSeq && text === lastOriginalText) {
-      updateOverlay(text, translated);
+    try {
+      const translated = await translate(text, controller.signal);
+      if (translated && currentSeq === translateSeq && text === lastOriginalText) {
+        updateOverlay(text, translated);
+      }
+    } finally {
+      if (activeTranslationController === controller) {
+        activeTranslationController = null;
+      }
     }
   }
 
-  async function requestTranslation(text) {
+  async function requestTranslation(text, signal) {
     const prepared = protectGlossaryTerms(text);
     for (let attempt = 0; attempt <= TRANSLATE_RETRY_DELAYS.length; attempt += 1) {
       try {
-        const resp = await fetchTranslationData(prepared.text);
+        const resp = await fetchTranslationData(prepared.text, signal);
         if (!resp.ok) {
-          console.warn(`[PanSub] translation API returned ${resp.status}`);
+          debug(`[PanSub] translation API returned ${resp.status}`);
           if (resp.status < 500 && resp.status !== 429) {
             return '';
           }
@@ -2048,18 +2300,83 @@
           if (translated) {
             return translated;
           }
-          console.warn('[PanSub] empty translation result:', data);
+          debug('[PanSub] empty translation result:', data);
         }
       } catch (err) {
-        console.error('[PanSub] translation failed:', err);
+        if (err?.name === 'AbortError') return '';
+        debug('[PanSub] translation failed:', err);
       }
 
       const delay = TRANSLATE_RETRY_DELAYS[attempt];
       if (!delay) break;
       translateBackoffUntil = Date.now() + delay;
-      await sleep(delay);
+      try {
+        await sleep(delay, signal);
+      } catch (err) {
+        if (err?.name === 'AbortError') return '';
+        throw err;
+      }
     }
     return '';
+  }
+
+  function clearAudioSubtitle() {
+    if (!audioRendered) return;
+    audioRendered = false;
+    lastAudioSequence = 0;
+    lastText = '';
+    updateOverlay('', '');
+  }
+
+  function applyAudioState(nextState) {
+    if (!nextState || (AUDIO_PROTOCOL?.isAudioState && !AUDIO_PROTOCOL.isAudioState(nextState))) return;
+    const previousSessionId = audioState.sessionId;
+    const previouslyOwnedOverlay = audioOwnsOverlay();
+    audioState = nextState;
+    const ownsOverlayNow = audioOwnsOverlay();
+    if (audioState.sessionId !== previousSessionId) lastAudioSequence = 0;
+    if (!previouslyOwnedOverlay && ownsOverlayNow) {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = null;
+      cancelActiveTranslation();
+      translateSeq += 1;
+      lastText = '';
+      lastTranslatedText = '';
+      audioRendered = false;
+      updateOverlay('', '');
+    }
+    if (previouslyOwnedOverlay && !ownsOverlayNow) {
+      clearAudioSubtitle();
+      window.setTimeout(handleCaptionChange, 0);
+    }
+    createFloatingButton();
+    applyFloatingButtonStyle();
+    updateFloatingPanel();
+  }
+
+  function applyAudioSubtitle(message) {
+    if (!settings.enabled || !audioOwnsOverlay()) return;
+    if (message.sessionId !== audioState.sessionId) return;
+    if (!Number.isInteger(message.sequence) || message.sequence <= lastAudioSequence) return;
+    const text = String(message.text || '').trim();
+    if (!text) return;
+    lastAudioSequence = message.sequence;
+    audioRendered = true;
+    cancelActiveTranslation();
+    translateSeq += 1;
+    updateOverlay('', text);
+  }
+
+  function handleAudioRuntimeMessage(message) {
+    if (message?.type === AUDIO_MESSAGES.STATE_CHANGED) {
+      applyAudioState(message.state);
+      return false;
+    }
+    if (message?.type === AUDIO_MESSAGES.SUBTITLE) {
+      applyAudioSubtitle(message);
+      return false;
+    }
+    return false;
   }
 
   function applyNativeCaptionVisibility(caption) {
@@ -2086,8 +2403,16 @@
     applyNativeCaptionVisibility(caption);
     applyOverlayPosition(caption);
 
+    const text = caption.el.textContent.trim();
+    if (text) {
+      lastNativeCaptionAt = Date.now();
+      reportNativeCaptionStatus(true);
+    }
+    if (audioOwnsOverlay()) return;
+
     if (!settings.enabled) {
       if (debounceTimer) clearTimeout(debounceTimer);
+      cancelActiveTranslation();
       translateSeq += 1;
       lastText = '';
       lastTranslatedText = '';
@@ -2095,14 +2420,15 @@
       return;
     }
 
-    const text = caption.el.textContent.trim();
     if (!text || text === lastText) return;
     lastText = text;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    cancelActiveTranslation();
     const currentSeq = ++translateSeq;
     debug(`[PanSub] New caption(${caption.mode}): ${text}`);
 
-    if (sourceLooksTranslated(text)) {
-      debug('[PanSub] caption appears page-translated; skipping machine translation:', text);
+    if (sourceAlreadyMatchesTarget(text)) {
+      debug('[PanSub] caption already matches target language; skipping machine translation:', text);
       updateOverlay('', text);
       return;
     }
@@ -2111,27 +2437,35 @@
 
     if (settings.displayMode === 'original') return;
 
-    if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
-      const translated = await translate(text);
-      if (translated && currentSeq === translateSeq && text === lastText) {
-        updateOverlay(text, translated);
-      } else if (translated) {
-        debug('[PanSub] stale translation ignored:', text);
+      const controller = new AbortController();
+      activeTranslationController = controller;
+      try {
+        const translated = await translate(text, controller.signal);
+        if (translated && currentSeq === translateSeq && text === lastText) {
+          updateOverlay(text, translated);
+        } else if (translated) {
+          debug('[PanSub] stale translation ignored:', text);
+        }
+      } finally {
+        if (activeTranslationController === controller) {
+          activeTranslationController = null;
+        }
       }
     }, DEBOUNCE_MS);
   }
 
   function attachObserver(target) {
-    if (observedCaptionEls.has(target)) return;
-    observedCaptionEls.add(target);
+    if (observedCaptionEl === target) return;
+    captionObserver?.disconnect();
+    observedCaptionEl = target;
     protectCaptionElement(target);
 
-    const observer = new MutationObserver(() => {
+    captionObserver = new MutationObserver(() => {
       protectCaptionElement(target);
       handleCaptionChange();
     });
-    observer.observe(target, {
+    captionObserver.observe(target, {
       childList: true,
       subtree: true,
       characterData: true
@@ -2152,12 +2486,24 @@
         mountExtensionElements();
         handleCaptionChange();
       }
+      const hasNativeCaptionText = Boolean(caption?.el?.textContent?.trim());
+      if (!hasNativeCaptionText
+        && Date.now() - Math.max(captionDetectionStartedAt, lastNativeCaptionAt) >= NATIVE_CAPTION_MISSING_MS) {
+        reportNativeCaptionStatus(false);
+      }
     }, POLL_MS);
   }
 
+  chrome.runtime.onMessage?.addListener(handleAudioRuntimeMessage);
+
   chrome.storage.local.get(['pansubEnabled', SETTINGS_KEY, CACHE_KEY], (result) => {
     mergeSettings(result[SETTINGS_KEY], result.pansubEnabled);
-    loadPersistentCache(result[CACHE_KEY]);
+    if (result[CACHE_KEY] !== undefined) {
+      chrome.storage.local.remove(CACHE_KEY, () => {
+        const error = chrome.runtime?.lastError;
+        if (error) console.warn('[PanSub] failed to remove legacy translation cache:', error.message);
+      });
+    }
     if (overlayEl) {
       applyVisibility();
       applyOverlayStyle();
@@ -2167,6 +2513,10 @@
     attachFullscreenListeners();
     mountExtensionElements();
     waitForCaption();
+    chrome.runtime.sendMessage({ type: AUDIO_MESSAGES.GET_STATE }, (response) => {
+      if (chrome.runtime?.lastError) return;
+      if (response?.state) applyAudioState(response.state);
+    });
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -2179,6 +2529,11 @@
       const shouldRetranslate = previousSettings.targetLanguage !== settings.targetLanguage
         || previousSettings.glossaryEnabled !== settings.glossaryEnabled
         || previousSettings.displayMode !== settings.displayMode;
+      if (!settings.enabled) {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        cancelActiveTranslation();
+        translateSeq += 1;
+      }
       if (shouldRetranslate) {
         lastTranslatedText = '';
       }
@@ -2194,7 +2549,6 @@
     }
     if (changes[CACHE_KEY]) {
       translationCache.clear();
-      loadPersistentCache(changes[CACHE_KEY].newValue);
     }
   });
 })();

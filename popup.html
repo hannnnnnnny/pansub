@@ -2,149 +2,95 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PanSub</title>
-  <style>
-    :root {
-      --ink: #f8fafc;
-      --muted: #a8b3c4;
-      --line: rgba(255,255,255,.12);
-      --accent: #6ea8ff;
-      --bg: #111827;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      width: 292px;
-      margin: 0;
-      padding: 16px;
-      color: var(--ink);
-      background: var(--bg);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    }
-
-    header {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-bottom: 14px;
-    }
-
-    .mark {
-      display: grid;
-      width: 36px;
-      height: 36px;
-      place-items: center;
-      border-radius: 8px;
-      background: var(--accent);
-      color: #08111f;
-      font-weight: 900;
-    }
-
-    h1 {
-      margin: 0;
-      font-size: 17px;
-    }
-
-    .status {
-      margin: 3px 0 0;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 12px 0;
-      border-top: 1px solid var(--line);
-    }
-
-    label,
-    .label {
-      font-size: 14px;
-      font-weight: 650;
-    }
-
-    select {
-      min-width: 128px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 7px 8px;
-      color: var(--ink);
-      background: #1f2937;
-    }
-
-    input[type="checkbox"] {
-      width: 42px;
-      height: 24px;
-      accent-color: var(--accent);
-    }
-
-    button {
-      width: 100%;
-      margin-top: 12px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      padding: 10px;
-      color: var(--ink);
-      background: #1f2937;
-      cursor: pointer;
-      font-weight: 700;
-    }
-
-    button:hover {
-      border-color: var(--accent);
-    }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
-<body>
-  <header>
-    <div class="mark">P</div>
-    <div>
-      <h1>PanSub</h1>
-      <p class="status" id="status" data-i18n="statusReady">Canvas / Panopto subtitles</p>
+<body class="is-loading">
+  <header class="brand-bar">
+    <div class="brand">
+      <img class="mark" src="assets/icon48.png" alt="">
+      <div><h1>PanSub</h1><p>LECTURE SIGNAL</p></div>
     </div>
+    <span class="version">1.2.0</span>
   </header>
 
-  <div class="row">
-    <span class="label" data-i18n="showSubtitles">Show subtitles</span>
-    <input type="checkbox" id="enabled">
-  </div>
+  <section class="status-panel" aria-live="polite">
+    <div class="status-copy">
+      <span class="status-dot" id="statusDot"></span>
+      <div>
+        <strong id="status" data-i18n="statusReady">Canvas / Panopto subtitles</strong>
+        <small id="statusDetail" data-i18n="statusDetail">Translation layer is ready</small>
+      </div>
+    </div>
+    <div class="signal-meter" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  </section>
 
-  <div class="row">
-    <label for="interfaceLanguage" data-i18n="interfaceLanguage">Interface</label>
-    <select id="interfaceLanguage">
-      <option value="en" data-i18n="languageEnglish">English</option>
-      <option value="zh-CN" data-i18n="languageChinese">中文</option>
-    </select>
-  </div>
+  <section class="audio-mode" aria-labelledby="audioModeTitle">
+    <div class="section-heading">
+      <div>
+        <strong id="audioModeTitle" data-i18n="audioMode">Audio Mode</strong>
+        <small data-i18n="audioModeBeta">LOCAL BETA</small>
+      </div>
+      <span id="audioStateBadge" class="audio-state-badge" data-i18n="audioAvailable">Available</span>
+    </div>
 
-  <div class="row">
-    <label for="displayMode" data-i18n="mode">Mode</label>
-    <select id="displayMode">
-      <option value="bilingual" data-i18n="displayBilingual">Bilingual</option>
-      <option value="translation" data-i18n="displayTranslation">Translation only</option>
-      <option value="original" data-i18n="displayOriginal">Original only</option>
-    </select>
-  </div>
+    <fieldset class="source-segment" aria-label="Subtitle source" data-i18n-aria="subtitleSource">
+      <label><input type="radio" name="subtitleSource" value="auto"><span data-i18n="sourceAuto">Auto</span></label>
+      <label><input type="radio" name="subtitleSource" value="native"><span data-i18n="sourceNative">Captions</span></label>
+      <label><input type="radio" name="subtitleSource" value="audio"><span data-i18n="sourceAudio">Tab audio</span></label>
+    </fieldset>
 
-  <div class="row">
-    <label for="subtitlePosition" data-i18n="position">Position</label>
-    <select id="subtitlePosition">
-      <option value="auto" data-i18n="positionAuto">Auto</option>
-      <option value="video-bottom" data-i18n="positionVideoBottom">Video bottom</option>
-      <option value="page-bottom" data-i18n="positionPageBottom">Page bottom</option>
-      <option value="follow-caption" data-i18n="positionFollowCaptionShort">Follow caption</option>
-      <option value="manual" data-i18n="positionManual">Manual drag</option>
-    </select>
-  </div>
+    <div class="audio-summary" aria-live="polite">
+      <span class="audio-summary-icon" aria-hidden="true">A</span>
+      <div><strong id="audioStatus" data-i18n="audioNoCaptions">No native captions detected</strong><small id="audioDetail" data-i18n="audioReadyDetail">Start only when you want PanSub to listen.</small></div>
+    </div>
 
-  <button id="openOptions" type="button" data-i18n="openSettings">Open settings</button>
+    <div class="audio-actions">
+      <button id="audioStart" type="button" class="primary-command"><span aria-hidden="true">▶</span><span data-i18n="audioStart">Start listening</span></button>
+      <button id="audioStop" type="button" class="danger-command" hidden><span aria-hidden="true">■</span><span data-i18n="audioStop">Stop listening</span></button>
+    </div>
 
+    <div id="audioDisclosure" class="audio-disclosure" hidden>
+      <strong data-i18n="audioDisclosureTitle">Before Audio Mode starts</strong>
+      <p data-i18n="audioDisclosureBody">PanSub captures only this tab. Chrome recognizes English locally. Audio and transcripts are not saved. Use it only for authorised personal study; do not export or share course content.</p>
+      <label class="consent-row"><input id="audioDisclosureAccepted" type="checkbox"><span data-i18n="audioDisclosureAccept">I understand and want to continue</span></label>
+      <div class="disclosure-actions">
+        <button id="audioCancelStart" type="button" class="quiet-command" data-i18n="cancel">Cancel</button>
+        <button id="audioConfirmStart" type="button" class="primary-command" disabled data-i18n="continue">Continue</button>
+      </div>
+    </div>
+
+    <div id="audioGoogleFallback" class="audio-disclosure" hidden>
+      <strong data-i18n="googleFallbackTitle">Local translation is unavailable</strong>
+      <p data-i18n="googleFallbackBody">Audio stays on this device, but recognized text must be sent to Google Translate to show translated subtitles.</p>
+      <label class="consent-row"><input id="audioGoogleFallbackAccepted" type="checkbox"><span data-i18n="googleFallbackAccept">Allow this text-only fallback</span></label>
+      <div class="disclosure-actions">
+        <button id="audioDeclineFallback" type="button" class="quiet-command" data-i18n="decline">Decline</button>
+        <button id="audioConfirmFallback" type="button" class="primary-command" disabled data-i18n="allowRetry">Allow and retry</button>
+      </div>
+    </div>
+  </section>
+
+  <main class="controls">
+    <label class="toggle-row" for="enabled">
+      <span><strong data-i18n="showSubtitles">Show subtitles</strong><small data-i18n="showSubtitlesHelp">Enable the live translation layer</small></span>
+      <input type="checkbox" id="enabled">
+    </label>
+
+    <div class="control-grid">
+      <label class="control-field" for="displayMode"><span data-i18n="mode">Mode</span><select id="displayMode"><option value="bilingual" data-i18n="displayBilingual">Bilingual</option><option value="translation" data-i18n="displayTranslation">Translation only</option><option value="original" data-i18n="displayOriginal">Original only</option></select></label>
+      <label class="control-field" for="targetLanguage"><span data-i18n="targetLanguage">Translate to</span><select id="targetLanguage"><option value="zh-CN" data-i18n="targetChineseSimplified">简体中文</option><option value="zh-TW" data-i18n="targetChineseTraditional">繁體中文</option><option value="ja" data-i18n="targetJapanese">日本語</option><option value="ko" data-i18n="targetKorean">한국어</option><option value="en" data-i18n="targetEnglish">English</option></select></label>
+      <label class="control-field" for="subtitlePosition"><span data-i18n="position">Position</span><select id="subtitlePosition"><option value="auto" data-i18n="positionAuto">Auto</option><option value="video-bottom" data-i18n="positionVideoBottom">Video bottom</option><option value="page-bottom" data-i18n="positionPageBottom">Page bottom</option><option value="follow-caption" data-i18n="positionFollowCaptionShort">Follow caption</option><option value="manual" data-i18n="positionManual">Manual drag</option></select></label>
+      <label class="control-field" for="interfaceLanguage"><span data-i18n="interfaceLanguage">Interface</span><select id="interfaceLanguage"><option value="en" data-i18n="languageEnglish">English</option><option value="zh-CN" data-i18n="languageChinese">中文</option></select></label>
+    </div>
+  </main>
+
+  <button id="openOptions" type="button" class="settings-button"><span class="settings-glyph" aria-hidden="true">⌘</span><span data-i18n="openSettings">Open settings</span><span aria-hidden="true">›</span></button>
+  <footer><span class="footer-dot"></span><span data-i18n="autoSync">Changes sync instantly</span><kbd>MV3</kbd></footer>
+
+  <script src="settings.js"></script>
+  <script src="audio-mode-protocol.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

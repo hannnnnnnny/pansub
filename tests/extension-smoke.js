@@ -42,14 +42,24 @@ function settings(overrides = {}) {
 
 async function installChromeMock(page) {
   await page.evaluate((initialSettings) => {
+    const NativeMutationObserver = window.MutationObserver;
     const listeners = [];
     const store = {
       pansubEnabled: true,
       pansubSettings: initialSettings,
-      pansubCache: {}
+      pansubCache: {
+        'zh-CN::plain::legacy lecture caption': '旧版课程字幕缓存'
+      }
     };
 
     window.__pansubStore = store;
+    window.__pansubObserverDisconnects = 0;
+    window.MutationObserver = class extends NativeMutationObserver {
+      disconnect() {
+        window.__pansubObserverDisconnects += 1;
+        return super.disconnect();
+      }
+    };
     window.chrome = {
       storage: {
         local: {
@@ -95,15 +105,22 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1200, height: 800 } });
   const translationRequests = [];
+  let firstTranslationRequest = null;
 
   await page.route('https://translate.googleapis.com/**', async (route) => {
     const request = route.request();
     const params = new URLSearchParams(request.postData() || new URL(request.url()).searchParams.toString());
     const source = params.get('q') || '';
+    const sourceLanguage = params.get('sl') || '';
     const targetLanguage = params.get('tl') || 'zh-CN';
-    translationRequests.push({ source, targetLanguage });
-    const translated = targetLanguage === 'ja'
+    translationRequests.push({ source, sourceLanguage, targetLanguage });
+    if (source.includes('first')) firstTranslationRequest = request;
+    const translated = targetLanguage === 'en'
+      ? 'English database subtitle'
+      : targetLanguage === 'ja'
       ? '二番目のデータベース字幕'
+      : source.includes('replacement')
+        ? '替换后的数据库字幕'
       : source.includes('second')
         ? '第二条数据库字幕'
         : '第一条数据库字幕';
@@ -130,11 +147,15 @@ async function main() {
     </html>`);
 
   await installChromeMock(page);
+  await page.addScriptTag({ path: path.join(root, 'settings.js') });
   await page.addScriptTag({ path: path.join(root, 'glossary.js') });
   await page.addScriptTag({ path: path.join(root, 'content.js') });
 
   await page.waitForSelector('#pansub-overlay-lock');
   await page.waitForTimeout(220);
+
+  const legacyCacheRemoved = await page.evaluate(() => !('pansubCache' in window.__pansubStore));
+  assert.strictEqual(legacyCacheRemoved, true, 'legacy persistent caption cache should be removed on startup');
 
   await page.evaluate(() => {
     document.querySelector('#overlayCaption').textContent = 'second database caption';
@@ -144,6 +165,21 @@ async function main() {
   const textAfterRace = await page.locator('#pansub-overlay').textContent();
   assert(textAfterRace.includes('第二条数据库字幕'), 'latest translation should win');
   assert(!textAfterRace.includes('first database caption'), 'translation-only mode should not show English placeholder');
+  await page.waitForTimeout(500);
+  assert(firstTranslationRequest?.failure(), 'superseded translation request should be aborted');
+
+  await page.evaluate(() => {
+    const current = document.querySelector('#overlayCaption');
+    const replacement = current.cloneNode(true);
+    replacement.textContent = 'replacement database caption';
+    current.replaceWith(replacement);
+  });
+  await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('替换后的数据库字幕'));
+  await page.waitForTimeout(1400);
+  const captionCachePersisted = await page.evaluate(() => 'pansubCache' in window.__pansubStore);
+  assert.strictEqual(captionCachePersisted, false, 'translated captions should remain session-only');
+  const observerDisconnects = await page.evaluate(() => window.__pansubObserverDisconnects);
+  assert(observerDisconnects >= 1, 'replacing the native caption should disconnect the old observer');
 
   const beforeDrag = await page.locator('#pansub-overlay').boundingBox();
   await page.mouse.move(beforeDrag.x + 30, beforeDrag.y + 16);
@@ -157,10 +193,35 @@ async function main() {
   assert(Number.isFinite(manualSettings.overlayManualY), 'manual Y should be saved');
 
   await page.evaluate(() => {
-    const next = { ...window.__pansubStore.pansubSettings, targetLanguage: 'ja' };
+    const next = {
+      ...window.__pansubStore.pansubSettings,
+      interfaceLanguage: 'zh-CN',
+      targetLanguage: 'ja'
+    };
     window.chrome.storage.local.set({ pansubSettings: next, pansubEnabled: true });
   });
   await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('二番目のデータベース字幕'));
+  const floatingLabel = await page.locator('#pansub-floating').getAttribute('aria-label');
+  assert.strictEqual(floatingLabel, 'PanSub 快捷控制');
+
+  await page.click('#pansub-floating');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('#pansub-floating-panel')).display !== 'none');
+  assert.strictEqual(await page.locator('#pansub-floating-panel').getAttribute('role'), 'dialog');
+  await page.waitForFunction(() => document.activeElement?.dataset?.pansubControl === 'enabled');
+  await page.click('[data-pansub-action="floatingSettings"]');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('#pansub-floating-settings')).display !== 'none');
+  assert.strictEqual(await page.locator('#pansub-floating-settings').getAttribute('role'), 'dialog');
+  await page.waitForFunction(() => document.activeElement?.dataset?.pansubFloatControl === 'floatingButtonSmall');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.activeElement?.id === 'pansub-floating');
+
+  await page.evaluate(() => {
+    const next = { ...window.__pansubStore.pansubSettings, targetLanguage: 'en' };
+    window.chrome.storage.local.set({ pansubSettings: next, pansubEnabled: true });
+    document.querySelector('#overlayCaption').textContent = '数据库字幕';
+  });
+  await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('English database subtitle'));
+  assert(translationRequests.every((request) => request.sourceLanguage === 'auto'), 'translation requests should auto-detect source language');
 
   const requestsBeforeDisable = translationRequests.length;
   await page.evaluate(() => {

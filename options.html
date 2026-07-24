@@ -6,87 +6,141 @@
   <title>PanSub Settings</title>
   <link rel="stylesheet" href="options.css">
 </head>
-<body>
+<body class="is-loading">
   <main class="shell">
     <aside class="rail">
-      <div>
-        <div class="mark">P</div>
-        <h1>PanSub</h1>
-        <p data-i18n="railSubtitle">Canvas / Panopto subtitle translator</p>
+      <div class="brand-lockup">
+        <img class="mark" src="assets/icon48.png" alt="">
+        <div>
+          <div class="brand-line">
+            <h1>PanSub</h1>
+            <span class="version-chip">1.2.0</span>
+          </div>
+          <p data-i18n="railSubtitle">Canvas / Panopto subtitle translator</p>
+        </div>
       </div>
+
+      <div class="signal-card" aria-live="polite">
+        <span class="signal-dot"></span>
+        <span>
+          <strong data-i18n="signalReady">Lecture signal ready</strong>
+          <small data-i18n="signalReadyHelp">Settings sync automatically</small>
+        </span>
+      </div>
+
       <nav aria-label="Settings sections" data-i18n-aria-label="settingsSections">
-        <a href="#general" data-i18n="navGeneral">General</a>
-        <a href="#subtitles" data-i18n="navSubtitles">Subtitles</a>
-        <a href="#translation" data-i18n="navTranslation">Translation</a>
-        <a href="#floating" data-i18n="navFloating">Quick Controls</a>
-        <a href="#debug" data-i18n="navDebug">Debug</a>
+        <a class="is-active" href="#general" data-section-link="general"><span>01</span><b data-i18n="navGeneral">General</b></a>
+        <a href="#subtitles" data-section-link="subtitles"><span>02</span><b data-i18n="navSubtitles">Subtitles</b></a>
+        <a href="#translation" data-section-link="translation"><span>03</span><b data-i18n="navTranslation">Translation</b></a>
+        <a href="#floating" data-section-link="floating"><span>04</span><b data-i18n="navFloating">Quick Controls</b></a>
+        <a href="#debug" data-section-link="debug"><span>05</span><b data-i18n="navDebug">Debug</b></a>
       </nav>
+
+      <button id="railCommand" class="rail-command" type="button">
+        <span data-i18n="findSetting">Find a setting</span>
+        <kbd>Ctrl K</kbd>
+      </button>
     </aside>
 
     <section class="panel">
       <header class="topbar">
         <div>
-          <p class="eyebrow" data-i18n="eyebrow">Settings</p>
+          <p class="eyebrow"><span class="eyebrow-pulse"></span><span data-i18n="eyebrow">Settings</span></p>
           <h2 data-i18n="pageTitle">Lecture subtitle controls</h2>
+          <p class="page-summary" data-i18n="pageSummary">Tune the translation layer without interrupting your lecture.</p>
         </div>
-        <button id="reset" type="button" data-i18n="reset">Reset</button>
+        <div class="topbar-actions">
+          <button id="openCommand" type="button" class="command-trigger">
+            <span class="search-glyph" aria-hidden="true"></span>
+            <span data-i18n="searchSettings">Search settings</span>
+            <kbd>Ctrl K</kbd>
+          </button>
+          <button id="reset" type="button" class="icon-action danger-action" data-i18n-aria-label="reset">
+            <span aria-hidden="true">↺</span>
+            <span data-i18n="reset">Reset</span>
+          </button>
+        </div>
       </header>
 
-      <section id="general" class="group">
+      <section id="general" class="group" data-search-key="general enable language native captions">
         <div class="group-title">
-          <h3 data-i18n="generalTitle">General</h3>
-          <p data-i18n="generalDescription">Choose when PanSub appears on Panopto recordings.</p>
+          <span class="section-index">01 / GENERAL</span>
+          <div>
+            <h3 data-i18n="generalTitle">General</h3>
+            <p data-i18n="generalDescription">Choose when PanSub appears on Panopto recordings.</p>
+          </div>
+          <span id="generalState" class="section-state">ACTIVE</span>
         </div>
-        <label class="field">
-          <span data-i18n="interfaceLanguage">Interface language</span>
-          <select id="interfaceLanguage">
-            <option value="en" data-i18n="languageEnglish">English</option>
-            <option value="zh-CN" data-i18n="languageChinese">中文</option>
-          </select>
-        </label>
+
+        <div class="field-grid">
+          <label class="field">
+            <span data-i18n="interfaceLanguage">Interface language</span>
+            <select id="interfaceLanguage">
+              <option value="en" data-i18n="languageEnglish">English</option>
+              <option value="zh-CN" data-i18n="languageChinese">中文</option>
+            </select>
+          </label>
+        </div>
+
         <label class="switch-row">
-          <span>
-            <strong data-i18n="enablePanSub">Enable PanSub</strong>
-            <small data-i18n="enablePanSubHelp">Show translated subtitles on matching Panopto pages.</small>
-          </span>
+          <span><strong data-i18n="enablePanSub">Enable PanSub</strong><small data-i18n="enablePanSubHelp">Show translated subtitles on matching Panopto pages.</small></span>
           <input id="enabled" type="checkbox">
         </label>
         <label class="switch-row">
-          <span>
-            <strong data-i18n="hideNativeCaptions">Hide native Panopto captions</strong>
-            <small data-i18n="hideNativeCaptionsHelp">Use this when the original captions overlap with PanSub.</small>
-          </span>
+          <span><strong data-i18n="hideNativeCaptions">Hide native Panopto captions</strong><small data-i18n="hideNativeCaptionsHelp">Use this when the original captions overlap with PanSub.</small></span>
           <input id="hideNativeCaptions" type="checkbox">
         </label>
       </section>
 
-      <section id="subtitles" class="group">
+      <section id="subtitles" class="group" data-search-key="subtitle display mode position theme font color size width opacity lock">
         <div class="group-title">
-          <h3 data-i18n="subtitleDisplayTitle">Subtitle Display</h3>
-          <p data-i18n="subtitleDisplayDescription">Control the overlay text, placement, and visual weight.</p>
+          <span class="section-index">02 / DISPLAY</span>
+          <div>
+            <h3 data-i18n="subtitleDisplayTitle">Subtitle Display</h3>
+            <p data-i18n="subtitleDisplayDescription">Control the overlay text, placement, and visual weight.</p>
+          </div>
+          <span class="section-state section-state-neutral" data-i18n="livePreviewLabel">LIVE PREVIEW</span>
         </div>
 
-        <label class="field">
-          <span data-i18n="displayMode">Display mode</span>
-          <select id="displayMode">
-            <option value="bilingual" data-i18n="displayBilingual">Bilingual</option>
-            <option value="translation" data-i18n="displayTranslation">Translation only</option>
-            <option value="original" data-i18n="displayOriginal">Original only</option>
-          </select>
-        </label>
+        <div class="subtitle-lab">
+          <div class="preview-stage" id="previewStage">
+            <div class="preview-chrome"><span></span><span></span><span></span><b>Panopto lecture</b></div>
+            <div class="preview-slide">
+              <span class="preview-kicker">COMPSCI 719</span>
+              <strong>Relational database design</strong>
+              <div class="preview-lines"><i></i><i></i><i></i></div>
+            </div>
+            <div id="subtitlePreview" class="subtitle-preview">
+              <button id="previewLock" type="button" tabindex="-1" aria-hidden="true">⌁</button>
+              <p id="previewOriginal">A primary key uniquely identifies each record.</p>
+              <strong id="previewTranslation">主键用于唯一标识每一条记录。</strong>
+            </div>
+          </div>
+          <div class="preview-readout">
+            <span><i class="readout-dot"></i><b data-i18n="previewRendering">Preview rendering</b></span>
+            <code id="previewReadout">BILINGUAL · AUTO · 24PX</code>
+          </div>
+        </div>
 
-        <label class="field">
-          <span data-i18n="position">Position</span>
-          <select id="subtitlePosition">
-            <option value="auto" data-i18n="positionAuto">Auto</option>
-            <option value="video-bottom" data-i18n="positionVideoBottom">Video bottom</option>
-            <option value="page-bottom" data-i18n="positionPageBottom">Page bottom</option>
-            <option value="follow-caption" data-i18n="positionFollowCaption">Follow caption element</option>
-            <option value="manual" data-i18n="positionManual">Manual drag</option>
-          </select>
-        </label>
-
-        <div class="grid">
+        <div class="field-grid two-up">
+          <label class="field">
+            <span data-i18n="displayMode">Display mode</span>
+            <select id="displayMode">
+              <option value="bilingual" data-i18n="displayBilingual">Bilingual</option>
+              <option value="translation" data-i18n="displayTranslation">Translation only</option>
+              <option value="original" data-i18n="displayOriginal">Original only</option>
+            </select>
+          </label>
+          <label class="field">
+            <span data-i18n="position">Position</span>
+            <select id="subtitlePosition">
+              <option value="auto" data-i18n="positionAuto">Auto</option>
+              <option value="video-bottom" data-i18n="positionVideoBottom">Video bottom</option>
+              <option value="page-bottom" data-i18n="positionPageBottom">Page bottom</option>
+              <option value="follow-caption" data-i18n="positionFollowCaption">Follow caption element</option>
+              <option value="manual" data-i18n="positionManual">Manual drag</option>
+            </select>
+          </label>
           <label class="field">
             <span data-i18n="stylePreset">Style preset</span>
             <select id="overlayTheme">
@@ -109,172 +163,92 @@
           </label>
         </div>
 
-        <div class="grid color-grid">
-          <label class="field color-field">
-            <span data-i18n="translationColor">Translation color</span>
-            <input id="subtitleColor" type="color">
-          </label>
-          <label class="field color-field">
-            <span data-i18n="originalColor">Original color</span>
-            <input id="originalColor" type="color">
-          </label>
-          <label class="field color-field">
-            <span data-i18n="boxColor">Box color</span>
-            <input id="overlayBackgroundColor" type="color">
-          </label>
-          <label class="field color-field">
-            <span data-i18n="borderColor">Border color</span>
-            <input id="overlayBorderColor" type="color">
-          </label>
+        <div class="color-strip">
+          <label class="color-field"><input id="subtitleColor" type="color"><span data-i18n="translationColor">Translation color</span></label>
+          <label class="color-field"><input id="originalColor" type="color"><span data-i18n="originalColor">Original color</span></label>
+          <label class="color-field"><input id="overlayBackgroundColor" type="color"><span data-i18n="boxColor">Box color</span></label>
+          <label class="color-field"><input id="overlayBorderColor" type="color"><span data-i18n="borderColor">Border color</span></label>
         </div>
 
         <label class="switch-row">
-          <span>
-            <strong data-i18n="lockSubtitleBox">Lock subtitle box</strong>
-            <small data-i18n="lockSubtitleBoxHelp">When locked, the subtitle box keeps its position and cannot be dragged.</small>
-          </span>
+          <span><strong data-i18n="lockSubtitleBox">Lock subtitle box</strong><small data-i18n="lockSubtitleBoxHelp">When locked, the subtitle box keeps its position and cannot be dragged.</small></span>
           <input id="overlayLocked" type="checkbox">
         </label>
         <button id="resetSubtitlePosition" type="button" class="secondary-action" data-i18n="resetSubtitlePosition">Reset subtitle box position</button>
 
-        <div class="grid">
-          <label class="field">
-            <span data-i18n="translationSize">Translation size</span>
-            <input id="fontSize" type="range" min="14" max="42" step="1">
-            <output id="fontSizeValue"></output>
-          </label>
-          <label class="field">
-            <span data-i18n="originalSize">Original size</span>
-            <input id="originalFontSize" type="range" min="10" max="24" step="1">
-            <output id="originalFontSizeValue"></output>
-          </label>
-          <label class="field">
-            <span data-i18n="overlayWidth">Overlay width</span>
-            <input id="maxWidth" type="range" min="40" max="96" step="1">
-            <output id="maxWidthValue"></output>
-          </label>
-          <label class="field">
-            <span data-i18n="backgroundOpacity">Background opacity</span>
-            <input id="backgroundOpacity" type="range" min="20" max="95" step="1">
-            <output id="backgroundOpacityValue"></output>
-          </label>
+        <div class="range-grid">
+          <label class="range-field"><span><b data-i18n="translationSize">Translation size</b><output id="fontSizeValue"></output></span><input id="fontSize" type="range" min="14" max="42" step="1"></label>
+          <label class="range-field"><span><b data-i18n="originalSize">Original size</b><output id="originalFontSizeValue"></output></span><input id="originalFontSize" type="range" min="10" max="24" step="1"></label>
+          <label class="range-field"><span><b data-i18n="overlayWidth">Overlay width</b><output id="maxWidthValue"></output></span><input id="maxWidth" type="range" min="40" max="96" step="1"></label>
+          <label class="range-field"><span><b data-i18n="backgroundOpacity">Background opacity</b><output id="backgroundOpacityValue"></output></span><input id="backgroundOpacity" type="range" min="20" max="95" step="1"></label>
         </div>
       </section>
 
-      <section id="translation" class="group">
-        <div class="group-title">
-          <h3 data-i18n="translationTitle">Translation</h3>
-          <p data-i18n="translationDescription">Keep the provider simple now, but make the language configurable.</p>
+      <section id="translation" class="group" data-search-key="translation target language provider academic glossary cache audio speech recognition consent privacy">
+        <div class="group-title"><span class="section-index">03 / ENGINE</span><div><h3 data-i18n="translationTitle">Translation</h3><p data-i18n="translationDescription">Choose the target language and translation behavior.</p></div><span class="section-state section-state-neutral">AUTO</span></div>
+        <div class="field-grid two-up">
+          <label class="field"><span data-i18n="targetLanguage">Target language</span><select id="targetLanguage"><option value="zh-CN" data-i18n="targetChineseSimplified">Chinese Simplified</option><option value="zh-TW" data-i18n="targetChineseTraditional">Chinese Traditional</option><option value="ja" data-i18n="targetJapanese">Japanese</option><option value="ko" data-i18n="targetKorean">Korean</option><option value="en" data-i18n="targetEnglish">English</option></select></label>
+          <label class="field"><span data-i18n="provider">Provider</span><select id="provider" disabled><option>Google Translate endpoint</option></select></label>
         </div>
-        <label class="field">
-          <span data-i18n="targetLanguage">Target language</span>
-          <select id="targetLanguage">
-            <option value="zh-CN" data-i18n="targetChineseSimplified">Chinese Simplified</option>
-            <option value="zh-TW" data-i18n="targetChineseTraditional">Chinese Traditional</option>
-            <option value="ja" data-i18n="targetJapanese">Japanese</option>
-            <option value="ko" data-i18n="targetKorean">Korean</option>
-            <option value="en" data-i18n="targetEnglish">English</option>
-          </select>
-        </label>
-        <label class="field">
-          <span data-i18n="provider">Provider</span>
-          <select id="provider" disabled>
-            <option>Google Translate endpoint</option>
-          </select>
-        </label>
-        <label class="switch-row">
-          <span>
-            <strong data-i18n="academicGlossary">Academic glossary</strong>
-            <small data-i18n="academicGlossaryHelp">Protect common academic terms across business, arts, IT, science, law, and more.</small>
-          </span>
-          <input id="glossaryEnabled" type="checkbox">
-        </label>
-        <label class="switch-row">
-          <span>
-            <strong data-i18n="localCache">Local translation cache</strong>
-            <small data-i18n="localCacheHelp">Reuse translated lines during the same course recording.</small>
-          </span>
-          <input id="cacheEnabled" type="checkbox">
-        </label>
+        <div id="translationAccuracyNotice" class="privacy-note"><strong data-i18n="translationAccuracyTitle">Check the original lecture</strong><p data-i18n="translationAccuracyDescription">Machine translations may be inaccurate. Treat the original lecture content as authoritative.</p></div>
+        <label class="switch-row"><span><strong data-i18n="academicGlossary">Academic glossary</strong><small data-i18n="academicGlossaryHelp">Protect common academic terms across business, arts, IT, science, law, and more.</small></span><input id="glossaryEnabled" type="checkbox"></label>
+        <label class="switch-row"><span><strong data-i18n="localCache">Session translation cache</strong><small data-i18n="localCacheHelp">Reuse translated lines only while the current Panopto page remains open.</small></span><input id="cacheEnabled" type="checkbox"></label>
         <button id="clearTranslationCache" type="button" class="secondary-action" data-i18n="clearTranslationCache">Clear translation cache</button>
+        <div class="subsection-heading">
+          <span class="section-index">AUDIO MODE / BETA</span>
+          <div><h4 data-i18n="audioSettingsTitle">Audio recognition</h4><p data-i18n="audioSettingsDescription">Used only when you explicitly start Audio Mode from the popup.</p></div>
+        </div>
+        <label class="field"><span data-i18n="audioSourceLanguage">Spoken English</span><select id="audioSourceLanguage"><option value="en-US" data-i18n="audioEnglishUS">English (United States)</option><option value="en-GB" data-i18n="audioEnglishGB">English (United Kingdom)</option><option value="en-AU" data-i18n="audioEnglishAU">English (Australia)</option><option value="en-NZ" data-i18n="audioEnglishNZ">English (New Zealand)</option><option value="en-CA" data-i18n="audioEnglishCA">English (Canada)</option></select><small data-i18n="audioSourceLanguageHelp">Choose the lecturer's closest accent for better recognition.</small></label>
+        <div class="privacy-note"><strong data-i18n="audioPrivacyTitle">Local by default</strong><p data-i18n="audioPrivacyDescription">Chrome recognizes tab audio on this device. PanSub does not save audio or transcripts. Google receives recognized text only after separate consent.</p></div>
+        <button id="resetAudioConsent" type="button" class="secondary-action danger-secondary" data-i18n="resetAudioConsent">Revoke Audio Mode permissions</button>
       </section>
 
-      <section id="floating" class="group">
-        <div class="group-title">
-          <h3 data-i18n="quickButtonTitle">Quick Controls</h3>
-          <p data-i18n="quickButtonDescription">Add a draggable page-side panel for subtitle mode, language, hiding, and settings while watching.</p>
+      <section id="floating" class="group" data-search-key="quick floating button compact opacity side hidden site">
+        <div class="group-title"><span class="section-index">04 / ACCESS</span><div><h3 data-i18n="quickButtonTitle">Quick Controls</h3><p data-i18n="quickButtonDescription">Add a draggable page-side panel for subtitle mode, language, hiding, and settings while watching.</p></div><span class="section-state section-state-neutral" data-i18n="draggable">DRAGGABLE</span></div>
+        <div class="dock-preview">
+          <div class="dock-track"><span class="dock-signal"></span><button type="button" class="sample-float" tabindex="-1">P</button><span class="dock-label">PAN<span>SUB</span></span><i></i></div>
+          <p data-i18n="samplePage">Panopto lecture recording</p>
         </div>
-        <div class="preview floating-preview">
-          <div class="sample-page">
-            <p data-i18n="samplePage">Panopto lecture recording</p>
-            <button type="button" class="sample-float">P</button>
-          </div>
-        </div>
-        <label class="switch-row">
-          <span>
-            <strong data-i18n="showQuickButton">Show quick button</strong>
-            <small data-i18n="showQuickButtonHelp">Display a small PanSub button on matching Panopto pages.</small>
-          </span>
-          <input id="floatingButtonEnabled" type="checkbox">
-        </label>
-        <label class="switch-row">
-          <span>
-            <strong data-i18n="compactQuickButton">Compact quick button</strong>
-            <small data-i18n="compactQuickButtonHelp">Use a smaller button when the player area is crowded.</small>
-          </span>
-          <input id="floatingButtonSmall" type="checkbox">
-        </label>
-        <label class="switch-row">
-          <span>
-            <strong data-i18n="fadeUntilHover">Fade until hover</strong>
-            <small data-i18n="fadeUntilHoverHelp">Keep the button quiet until your cursor moves over it.</small>
-          </span>
-          <input id="floatingButtonHoverOnly" type="checkbox">
-        </label>
-        <div class="grid">
-          <label class="field">
-            <span data-i18n="side">Side</span>
-            <select id="floatingButtonSide">
-              <option value="right" data-i18n="sideRight">Right</option>
-              <option value="left" data-i18n="sideLeft">Left</option>
-            </select>
-          </label>
-          <label class="field">
-            <span data-i18n="collapsedOpacity">Collapsed opacity</span>
-            <input id="floatingButtonOpacity" type="range" min="20" max="100" step="1">
-            <output id="floatingButtonOpacityValue"></output>
-          </label>
+        <label class="switch-row"><span><strong data-i18n="showQuickButton">Show quick button</strong><small data-i18n="showQuickButtonHelp">Display a small PanSub button on matching Panopto pages.</small></span><input id="floatingButtonEnabled" type="checkbox"></label>
+        <label class="switch-row"><span><strong data-i18n="compactQuickButton">Compact quick button</strong><small data-i18n="compactQuickButtonHelp">Use a smaller button when the player area is crowded.</small></span><input id="floatingButtonSmall" type="checkbox"></label>
+        <label class="switch-row"><span><strong data-i18n="fadeUntilHover">Fade until hover</strong><small data-i18n="fadeUntilHoverHelp">Keep the button quiet until your cursor moves over it.</small></span><input id="floatingButtonHoverOnly" type="checkbox"></label>
+        <div class="field-grid two-up">
+          <label class="field"><span data-i18n="side">Side</span><select id="floatingButtonSide"><option value="right" data-i18n="sideRight">Right</option><option value="left" data-i18n="sideLeft">Left</option></select></label>
+          <label class="range-field compact"><span><b data-i18n="collapsedOpacity">Collapsed opacity</b><output id="floatingButtonOpacityValue"></output></span><input id="floatingButtonOpacity" type="range" min="20" max="100" step="1"></label>
         </div>
         <button id="resetFloatingPosition" type="button" class="secondary-action" data-i18n="resetQuickButtonPosition">Reset button position</button>
-        <label class="field">
-          <span data-i18n="disabledSites">Sites where the button is hidden</span>
-          <textarea id="floatingButtonDisabledHosts" rows="3" spellcheck="false"></textarea>
-          <small data-i18n="disabledSitesHelp">One hostname per line. Remove a hostname to show the button there again.</small>
-        </label>
+        <label class="field"><span data-i18n="disabledSites">Sites where the button is hidden</span><textarea id="floatingButtonDisabledHosts" rows="3" spellcheck="false"></textarea><small data-i18n="disabledSitesHelp">One hostname per line. Remove a hostname to show the button there again.</small></label>
         <button id="clearDisabledSites" type="button" class="secondary-action" data-i18n="clearDisabledSites">Clear hidden sites</button>
       </section>
 
-      <section id="debug" class="group">
-        <div class="group-title">
-          <h3 data-i18n="debugTitle">Debug</h3>
-          <p data-i18n="debugDescription">Useful when Panopto changes its player markup.</p>
-        </div>
-        <label class="switch-row">
-          <span>
-            <strong data-i18n="consoleDiagnostics">Console diagnostics</strong>
-            <small data-i18n="consoleDiagnosticsHelp">Print matched caption nodes and subtitle updates.</small>
-          </span>
-          <input id="debugLogs" type="checkbox">
-        </label>
-        <div class="note" data-i18n-html="debugNote">
-          Open DevTools on the Panopto page and look for <code>[PanSub]</code> messages.
-        </div>
+      <section id="debug" class="group" data-search-key="debug diagnostics console logs panopto markup">
+        <div class="group-title"><span class="section-index">05 / DIAGNOSTICS</span><div><h3 data-i18n="debugTitle">Debug</h3><p data-i18n="debugDescription">Useful when Panopto changes its player markup.</p></div><span class="section-state section-state-neutral">DEV</span></div>
+        <label class="switch-row"><span><strong data-i18n="consoleDiagnostics">Console diagnostics</strong><small data-i18n="consoleDiagnosticsHelp">Print matched caption nodes and subtitle updates.</small></span><input id="debugLogs" type="checkbox"></label>
+        <div class="note" data-i18n-html="debugNote">Open DevTools on the Panopto page and look for <code>[PanSub]</code> messages.</div>
       </section>
 
-      <div id="saved" class="toast" role="status" aria-live="polite" data-i18n="saved">Saved</div>
+      <footer class="page-footer"><span>PanSub · Lecture translation layer</span><span data-i18n="autoSaveFooter">Changes save automatically</span></footer>
+      <div id="saved" class="toast" role="status" aria-live="polite"><span class="toast-icon">✓</span><span data-i18n="saved">Saved</span></div>
     </section>
   </main>
 
+  <div id="commandPalette" class="command-palette" role="dialog" aria-modal="true" aria-labelledby="commandTitle" hidden>
+    <div class="command-surface">
+      <div class="command-input-row"><span class="search-glyph" aria-hidden="true"></span><input id="commandSearch" type="search" autocomplete="off" data-i18n-placeholder="searchSettingsPlaceholder" placeholder="Search settings..."><kbd>ESC</kbd></div>
+      <p id="commandTitle" data-i18n="jumpToSetting">Jump to setting</p>
+      <div id="commandResults" class="command-results">
+        <button type="button" data-command-target="general"><span>01</span><b data-i18n="navGeneral">General</b><small data-i18n="generalDescription">Choose when PanSub appears on Panopto recordings.</small></button>
+        <button type="button" data-command-target="subtitles"><span>02</span><b data-i18n="navSubtitles">Subtitles</b><small data-i18n="subtitleDisplayDescription">Control the overlay text, placement, and visual weight.</small></button>
+        <button type="button" data-command-target="translation"><span>03</span><b data-i18n="navTranslation">Translation</b><small data-i18n="translationDescription">Choose the target language and translation behavior.</small></button>
+        <button type="button" data-command-target="floating"><span>04</span><b data-i18n="navFloating">Quick Controls</b><small data-i18n="quickButtonDescription">Add a draggable page-side panel.</small></button>
+        <button type="button" data-command-target="debug"><span>05</span><b data-i18n="navDebug">Debug</b><small data-i18n="debugDescription">Useful when Panopto changes its player markup.</small></button>
+      </div>
+      <div class="command-empty" id="commandEmpty" hidden data-i18n="noSettingsFound">No matching settings</div>
+      <footer><span><kbd>↑↓</kbd> <span data-i18n="navigate">Navigate</span></span><span><kbd>↵</kbd> <span data-i18n="open">Open</span></span></footer>
+    </div>
+  </div>
+
+  <script src="settings.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

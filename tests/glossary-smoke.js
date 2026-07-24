@@ -61,6 +61,19 @@ async function installChromeMock(page) {
             }
             listeners.forEach((listener) => listener(changes, 'local'));
             cb?.();
+          },
+          remove(keys, cb) {
+            const changes = {};
+            const list = Array.isArray(keys) ? keys : [keys];
+            for (const key of list) {
+              if (!(key in store)) continue;
+              changes[key] = { oldValue: store[key], newValue: undefined };
+              delete store[key];
+            }
+            if (Object.keys(changes).length) {
+              listeners.forEach((listener) => listener(changes, 'local'));
+            }
+            cb?.();
           }
         },
         onChanged: {
@@ -103,6 +116,7 @@ async function main() {
     </html>`);
 
   await installChromeMock(page);
+  await page.addScriptTag({ path: path.join(root, 'settings.js') });
   await page.addScriptTag({ path: path.join(root, 'glossary.js') });
   await page.addScriptTag({ path: path.join(root, 'content.js') });
   await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('应收账款'));

@@ -2,6 +2,9 @@ dist/
 tmp/
 node_modules/
 .playwright-cli/
+.superpowers/
+.worktrees/
+output/
 *.zip
 .env
 .DS_Store
