@@ -181,6 +181,25 @@ async function main() {
   const observerDisconnects = await page.evaluate(() => window.__pansubObserverDisconnects);
   assert(observerDisconnects >= 1, 'replacing the native caption should disconnect the old observer');
 
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = '';
+  });
+  await page.waitForTimeout(100);
+  const gapState = await page.locator('#pansub-overlay').evaluate((overlay) => ({
+    display: getComputedStyle(overlay).display,
+    inlineStyle: overlay.getAttribute('style')
+  }));
+  assert.strictEqual(gapState.display, 'none', `empty caption should hide the overlay: ${JSON.stringify(gapState)}`);
+
+  const textDuringGap = await page.locator('#pansub-overlay').textContent();
+  assert(!textDuringGap.includes('second database caption'), 'empty caption should clear the previous source text');
+  assert(!textDuringGap.includes('第二条数据库字幕'), 'empty caption should clear the previous translation');
+
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = 'second database caption';
+  });
+  await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('第二条数据库字幕'));
+
   const beforeDrag = await page.locator('#pansub-overlay').boundingBox();
   await page.mouse.move(beforeDrag.x + 30, beforeDrag.y + 16);
   await page.mouse.down();

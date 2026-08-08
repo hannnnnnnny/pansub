@@ -1271,9 +1271,13 @@
 
   function applyVisibility() {
     if (!overlayEl) return;
-    const hasVisibleSubtitle = settings.displayMode !== 'translation'
-      || Boolean(lastTranslatedText)
-      || sourceAlreadyMatchesTarget(lastOriginalText);
+    const hasSource = Boolean(lastOriginalText);
+    const hasTranslation = Boolean(lastTranslatedText) || sourceAlreadyMatchesTarget(lastOriginalText);
+    const hasVisibleSubtitle = settings.displayMode === 'original'
+      ? hasSource
+      : settings.displayMode === 'translation'
+        ? hasTranslation
+        : hasSource || hasTranslation;
     overlayEl.style.display = settings.enabled && hasVisibleSubtitle ? 'block' : 'none';
   }
 
@@ -2034,7 +2038,6 @@
     document.getElementById(TRANSLATED_ID)?.setAttribute('lang', settings.targetLanguage);
     lastOriginalText = originalText;
     lastTranslatedText = translatedText;
-    applyVisibility();
 
     const original = document.getElementById(ORIGINAL_ID);
     const translated = document.getElementById(TRANSLATED_ID);
@@ -2076,6 +2079,7 @@
     if (!overlayDrag) {
       applyOverlayPosition(activeCaption);
     }
+    applyVisibility();
   }
 
   function glossarySupported() {
@@ -2393,50 +2397,31 @@
     }
   }
 
-  function handleCaptionChange() {
-    const caption = findCaptionElement();
-    if (!caption) return;
-
-    activeCaption = caption;
-    attachObserver(caption.el);
-    protectCaptionElement(caption.el);
-    applyNativeCaptionVisibility(caption);
-    applyOverlayPosition(caption);
-
-    const text = caption.el.textContent.trim();
-    if (text) {
-      lastNativeCaptionAt = Date.now();
-      reportNativeCaptionStatus(true);
+  function clearCurrentCaption() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
     }
-    if (audioOwnsOverlay()) return;
-
-    if (!settings.enabled) {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      cancelActiveTranslation();
-      translateSeq += 1;
-      lastText = '';
-      lastTranslatedText = '';
-      applyVisibility();
-      return;
-    }
-
-    if (!text || text === lastText) return;
-    lastText = text;
-    if (debounceTimer) clearTimeout(debounceTimer);
     cancelActiveTranslation();
-    const currentSeq = ++translateSeq;
-    debug(`[PanSub] New caption(${caption.mode}): ${text}`);
+    translateSeq += 1;
+    lastText = '';
+    updateOverlay('', '');
+  }
 
-    if (sourceAlreadyMatchesTarget(text)) {
-      debug('[PanSub] caption already matches target language; skipping machine translation:', text);
-      updateOverlay('', text);
-      return;
+  function stopCaptionProcessing() {
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      debounceTimer = null;
     }
+    cancelActiveTranslation();
+    translateSeq += 1;
+    lastText = '';
+    lastTranslatedText = '';
+    applyVisibility();
+  }
 
-    updateOverlay(text, '');
-
-    if (settings.displayMode === 'original') return;
-
+  function scheduleCaptionTranslation(text, currentSeq) {
+    if (debounceTimer) clearTimeout(debounceTimer);
     debounceTimer = setTimeout(async () => {
       const controller = new AbortController();
       activeTranslationController = controller;
@@ -2453,6 +2438,59 @@
         }
       }
     }, DEBOUNCE_MS);
+  }
+
+  function clearMissingCaption() {
+    if (!activeCaption) return;
+    activeCaption = null;
+    clearCurrentCaption();
+  }
+
+  function handleCaptionChange(caption = findCaptionElement()) {
+    if (!caption) {
+      if (!audioOwnsOverlay()) clearMissingCaption();
+      return;
+    }
+
+    activeCaption = caption;
+    attachObserver(caption.el);
+    protectCaptionElement(caption.el);
+    applyNativeCaptionVisibility(caption);
+    applyOverlayPosition(caption);
+
+    const text = caption.el.textContent.trim();
+    if (text) {
+      lastNativeCaptionAt = Date.now();
+      reportNativeCaptionStatus(true);
+    }
+    if (audioOwnsOverlay()) return;
+
+    if (!settings.enabled) {
+      stopCaptionProcessing();
+      return;
+    }
+
+    if (!text) {
+      clearCurrentCaption();
+      return;
+    }
+    if (text === lastText) return;
+    lastText = text;
+    if (debounceTimer) clearTimeout(debounceTimer);
+    cancelActiveTranslation();
+    const currentSeq = ++translateSeq;
+    debug(`[PanSub] New caption(${caption.mode}): ${text}`);
+
+    if (sourceAlreadyMatchesTarget(text)) {
+      debug('[PanSub] caption already matches target language; skipping machine translation:', text);
+      updateOverlay('', text);
+      return;
+    }
+
+    updateOverlay(text, '');
+
+    if (settings.displayMode === 'original') return;
+    scheduleCaptionTranslation(text, currentSeq);
   }
 
   function attachObserver(target) {
@@ -2484,8 +2522,8 @@
         createOverlay();
         createFloatingButton();
         mountExtensionElements();
-        handleCaptionChange();
       }
+      handleCaptionChange(caption);
       const hasNativeCaptionText = Boolean(caption?.el?.textContent?.trim());
       if (!hasNativeCaptionText
         && Date.now() - Math.max(captionDetectionStartedAt, lastNativeCaptionAt) >= NATIVE_CAPTION_MISSING_MS) {
