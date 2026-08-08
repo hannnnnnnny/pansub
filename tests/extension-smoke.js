@@ -118,14 +118,16 @@ async function main() {
     const translated = targetLanguage === 'en'
       ? 'English database subtitle'
       : targetLanguage === 'ja'
-      ? '二番目のデータベース字幕'
-      : source.includes('replacement')
-        ? '替换后的数据库字幕'
-      : source.includes('second')
-        ? '第二条数据库字幕'
-        : '第一条数据库字幕';
+        ? '二番目のデータベース字幕'
+        : source.includes('slow gap')
+          ? '延迟字幕翻译'
+          : source.includes('replacement')
+            ? '替换后的数据库字幕'
+            : source.includes('second')
+              ? '第二条数据库字幕'
+              : '第一条数据库字幕';
 
-    if (source.includes('first')) {
+    if (source.includes('first') || source.includes('slow gap')) {
       await page.waitForTimeout(450);
     }
 
@@ -151,7 +153,7 @@ async function main() {
   await page.addScriptTag({ path: path.join(root, 'glossary.js') });
   await page.addScriptTag({ path: path.join(root, 'content.js') });
 
-  await page.waitForSelector('#pansub-overlay-lock');
+  await page.waitForSelector('#pansub-overlay-lock', { state: 'attached' });
   await page.waitForTimeout(220);
 
   const legacyCacheRemoved = await page.evaluate(() => !('pansubCache' in window.__pansubStore));
@@ -180,6 +182,91 @@ async function main() {
   assert.strictEqual(captionCachePersisted, false, 'translated captions should remain session-only');
   const observerDisconnects = await page.evaluate(() => window.__pansubObserverDisconnects);
   assert(observerDisconnects >= 1, 'replacing the native caption should disconnect the old observer');
+
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = 'slow gap caption';
+  });
+  for (let attempt = 0; attempt < 20 && !translationRequests.some(({ source }) => source === 'slow gap caption'); attempt += 1) {
+    await page.waitForTimeout(50);
+  }
+  assert(translationRequests.some(({ source }) => source === 'slow gap caption'), 'slow translation should be in flight before the cue ends');
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = '';
+  });
+  await page.waitForTimeout(500);
+  const gapState = await page.locator('#pansub-overlay').evaluate((overlay) => ({
+    display: getComputedStyle(overlay).display,
+    inlineStyle: overlay.getAttribute('style')
+  }));
+  assert.strictEqual(gapState.display, 'none', `empty caption should hide the overlay: ${JSON.stringify(gapState)}`);
+
+  const textDuringGap = await page.locator('#pansub-overlay').textContent();
+  assert(!textDuringGap.includes('second database caption'), 'empty caption should clear the previous source text');
+  assert(!textDuringGap.includes('第二条数据库字幕'), 'empty caption should clear the previous translation');
+  assert(!textDuringGap.includes('延迟字幕翻译'), 'late translation should not restore an ended cue');
+
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = 'slow gap caption';
+  });
+  await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('延迟字幕翻译'));
+
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = 'second database caption';
+  });
+  await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('第二条数据库字幕'));
+
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').remove();
+  });
+  await page.waitForFunction(() => {
+    const overlay = document.querySelector('#pansub-overlay');
+    return overlay && getComputedStyle(overlay).display === 'none';
+  }, null, { timeout: 2000 });
+
+  await page.evaluate(() => {
+    const caption = document.createElement('div');
+    caption.id = 'overlayCaption';
+    caption.style.cssText = 'position:absolute;left:140px;right:140px;bottom:50px;font-size:22px;color:white';
+    caption.textContent = 'second database caption';
+    document.querySelector('#rightPlayerContainer').appendChild(caption);
+  });
+  await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('第二条数据库字幕'));
+
+  await page.evaluate(() => {
+    const next = { ...window.__pansubStore.pansubSettings, displayMode: 'bilingual' };
+    window.chrome.storage.local.set({ pansubSettings: next, pansubEnabled: true });
+  });
+  await page.waitForFunction(() => {
+    const overlay = document.querySelector('#pansub-overlay');
+    return overlay?.textContent.includes('second database caption')
+      && overlay.textContent.includes('第二条数据库字幕');
+  });
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = '';
+  });
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('#pansub-overlay')).display === 'none');
+  const bilingualGapDisplay = await page.locator('#pansub-overlay').evaluate((overlay) => getComputedStyle(overlay).display);
+  assert.strictEqual(bilingualGapDisplay, 'none', 'bilingual mode should hide the overlay during an empty cue');
+
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = 'second database caption';
+    const next = { ...window.__pansubStore.pansubSettings, displayMode: 'original' };
+    window.chrome.storage.local.set({ pansubSettings: next, pansubEnabled: true });
+  });
+  await page.waitForFunction(() => document.querySelector('#pansub-original')?.textContent === 'second database caption');
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = '';
+  });
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('#pansub-overlay')).display === 'none');
+  const originalGapDisplay = await page.locator('#pansub-overlay').evaluate((overlay) => getComputedStyle(overlay).display);
+  assert.strictEqual(originalGapDisplay, 'none', 'original mode should hide the overlay during an empty cue');
+
+  await page.evaluate(() => {
+    document.querySelector('#overlayCaption').textContent = 'second database caption';
+    const next = { ...window.__pansubStore.pansubSettings, displayMode: 'translation' };
+    window.chrome.storage.local.set({ pansubSettings: next, pansubEnabled: true });
+  });
+  await page.waitForFunction(() => document.querySelector('#pansub-overlay')?.textContent.includes('第二条数据库字幕'));
 
   const beforeDrag = await page.locator('#pansub-overlay').boundingBox();
   await page.mouse.move(beforeDrag.x + 30, beforeDrag.y + 16);
