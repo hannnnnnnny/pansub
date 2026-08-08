@@ -2446,23 +2446,27 @@
     clearCurrentCaption();
   }
 
+  function activateCaption(caption) {
+    activeCaption = caption;
+    attachObserver(caption.el);
+    protectCaptionElement(caption.el);
+    applyNativeCaptionVisibility(caption);
+    applyOverlayPosition(caption);
+    const text = caption.el.textContent.trim();
+    if (text) {
+      lastNativeCaptionAt = Date.now();
+      reportNativeCaptionStatus(true);
+    }
+    return text;
+  }
+
   function handleCaptionChange(caption = findCaptionElement()) {
     if (!caption) {
       if (!audioOwnsOverlay()) clearMissingCaption();
       return;
     }
 
-    activeCaption = caption;
-    attachObserver(caption.el);
-    protectCaptionElement(caption.el);
-    applyNativeCaptionVisibility(caption);
-    applyOverlayPosition(caption);
-
-    const text = caption.el.textContent.trim();
-    if (text) {
-      lastNativeCaptionAt = Date.now();
-      reportNativeCaptionStatus(true);
-    }
+    const text = activateCaption(caption);
     if (audioOwnsOverlay()) return;
 
     if (!settings.enabled) {

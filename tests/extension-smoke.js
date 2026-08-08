@@ -153,7 +153,7 @@ async function main() {
   await page.addScriptTag({ path: path.join(root, 'glossary.js') });
   await page.addScriptTag({ path: path.join(root, 'content.js') });
 
-  await page.waitForSelector('#pansub-overlay-lock');
+  await page.waitForSelector('#pansub-overlay-lock', { state: 'attached' });
   await page.waitForTimeout(220);
 
   const legacyCacheRemoved = await page.evaluate(() => !('pansubCache' in window.__pansubStore));
